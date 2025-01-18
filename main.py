@@ -6,6 +6,9 @@ from telebot import TeleBot
 BOT_TOKEN = '7646738501:AAFzHOOyPfJcE_3t4fjwGSd1FKhqwa4hcOo'
 bot = TeleBot(BOT_TOKEN)
 
+saved_quizzes = {}  # To store all quizzes
+creating_quizzes = {}
+
 # Dynamically load plugins
 def load_plugins():
     plugin_folder = 'plugins'
