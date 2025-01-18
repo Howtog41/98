@@ -4,7 +4,7 @@ import time
 
 active_quizzes = {}
 
-def register_handlers(bot):
+def register_handlers(bot, saved_quizzes, creating_quizzes):
     @bot.message_handler(func=lambda message: message.text.startswith("/start_"))
     def start_quiz(message):
         chat_id = message.chat.id
