@@ -1,6 +1,6 @@
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-def register_handlers(bot, saved_quizzes):
+def register_handlers(bot, saved_quizzes, creating_quizzes):
     @bot.message_handler(commands=['view_quizzes'])
     def view_quizzes(message):
         """Display all saved quizzes with options to edit or share."""
