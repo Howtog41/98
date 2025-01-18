@@ -13,6 +13,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes):
         creating_quizzes[chat_id] = {
             "title": None,
             "questions": [],
+            "current_pre_poll_message": None,
             "timer": None
         }
         bot.send_message(chat_id, "Please send the quiz title.")
@@ -22,23 +23,60 @@ def register_handlers(bot, saved_quizzes, creating_quizzes):
         """Set the title for the quiz."""
         chat_id = message.chat.id
         creating_quizzes[chat_id]["title"] = message.text
-        bot.send_message(chat_id, "Quiz title saved! 🎉\nNow forward polls from your channel to add them to the quiz.\nType /done when you're finished.")
+        bot.send_message(
+            chat_id,
+            "Quiz title saved! 🎉\nNow send a pre-poll message (optional) for the next poll (text, image, or video).\n"
+            "If you don't want to add a pre-poll message, simply forward the poll.\n"
+            "Type /done when you're finished."
+        )
+
+    @bot.message_handler(func=lambda message: message.chat.id in creating_quizzes and creating_quizzes[message.chat.id]["title"], content_types=['text', 'photo', 'video'])
+    def set_individual_pre_poll_message(message):
+        """Set a pre-poll message for the next poll."""
+        chat_id = message.chat.id
+        if message.content_type == 'text':
+            creating_quizzes[chat_id]["current_pre_poll_message"] = {"type": "text", "content": message.text}
+        elif message.content_type == 'photo':
+            file_id = message.photo[-1].file_id
+            creating_quizzes[chat_id]["current_pre_poll_message"] = {"type": "photo", "content": file_id}
+        elif message.content_type == 'video':
+            file_id = message.video.file_id
+            creating_quizzes[chat_id]["current_pre_poll_message"] = {"type": "video", "content": file_id}
+
+        bot.send_message(
+            chat_id,
+            "Pre-poll message saved! 🎉\nNow forward the poll this message applies to.\n"
+            "If you sent this message by mistake, send another message to overwrite it."
+        )
 
     @bot.message_handler(content_types=['poll'])
     def handle_forwarded_poll(message):
-        """Add a forwarded poll to the quiz."""
+        """Add a forwarded poll to the quiz, along with its pre-poll message."""
         chat_id = message.chat.id
         if chat_id not in creating_quizzes or not creating_quizzes[chat_id].get("title"):
             bot.send_message(chat_id, "You are not currently creating a quiz. Use /create_quiz to start.")
             return
+
         poll = message.poll
+        pre_poll_message = creating_quizzes[chat_id]["current_pre_poll_message"]
+
+        # Add the poll with its pre-poll message
         creating_quizzes[chat_id]["questions"].append({
+            "pre_poll_message": pre_poll_message,
             "question": poll.question,
             "options": [opt.text for opt in poll.options],
             "correct_option_id": poll.correct_option_id,
             "explanation": poll.explanation or "No explanation provided."
         })
-        bot.send_message(chat_id, f"Poll added: {poll.question}\nSend another poll or type /done to finish.")
+
+        # Reset the current pre-poll message after attaching it to the poll
+        creating_quizzes[chat_id]["current_pre_poll_message"] = None
+
+        bot.send_message(
+            chat_id,
+            f"Poll added: {poll.question}\nSend another pre-poll message (optional) or forward another poll.\n"
+            "Type /done when you're finished."
+        )
 
     @bot.message_handler(commands=['done'])
     def finish_quiz_creation(message):
@@ -49,7 +87,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes):
             return
         bot.send_message(chat_id, "Quiz creation complete! 🎉\nNow, send the quiz duration in seconds (e.g., 120 for 2 minutes).")
 
-    @bot.message_handler(func=lambda message: message.chat.id in creating_quizzes and creating_quizzes[message.chat.id]["title"] and not creating_quizzes[message.chat.id]["timer"])
+    @bot.message_handler(func=lambda message: message.chat.id in creating_quizzes and creating_quizzes[message.chat.id]["title"] and creating_quizzes[message.chat.id]["timer"] is None)
     def set_quiz_timer(message):
         """Set the timer for the quiz."""
         chat_id = message.chat.id
