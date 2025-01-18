@@ -4,7 +4,7 @@ import string
 def generate_quiz_id():
     """Generate a unique quiz ID."""
     return ''.join(random.choices(string.ascii_letters + string.digits, k=6))
-
+    
 def register_handlers(bot, saved_quizzes, creating_quizzes):
     @bot.message_handler(commands=['create_quiz'])
     def create_quiz(message):
@@ -27,10 +27,21 @@ def register_handlers(bot, saved_quizzes, creating_quizzes):
             chat_id,
             "Quiz title saved! 🎉\nNow send a pre-poll message (optional) for the next poll (text, image, or video).\n"
             "If you don't want to add a pre-poll message, simply forward the poll.\n"
-            "Type /done when you're finished."
+            "Type /done when you're finished.\n"
+            "If you sent a pre-poll message by mistake, use /undo to reset it."
         )
 
-    @bot.message_handler(func=lambda message: message.chat.id in creating_quizzes and creating_quizzes[message.chat.id]["title"], content_types=['text', 'photo', 'video'])
+    @bot.message_handler(commands=['undo'])
+    def undo_pre_poll_message(message):
+        """Undo the last pre-poll message."""
+        chat_id = message.chat.id
+        if chat_id in creating_quizzes and creating_quizzes[chat_id]["current_pre_poll_message"]:
+            creating_quizzes[chat_id]["current_pre_poll_message"] = None
+            bot.send_message(chat_id, "Pre-poll message cleared! 🎉\nNow you can send a new pre-poll message or forward the poll.")
+        else:
+            bot.send_message(chat_id, "No pre-poll message to undo. You can send a new pre-poll message or forward the poll.")
+
+    @bot.message_handler(func=lambda message: message.chat.id in creating_quizzes and creating_quizzes[message.chat.id]["title"] and message.text not in ['/done', '/undo'], content_types=['text', 'photo', 'video'])
     def set_individual_pre_poll_message(message):
         """Set a pre-poll message for the next poll."""
         chat_id = message.chat.id
@@ -46,7 +57,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes):
         bot.send_message(
             chat_id,
             "Pre-poll message saved! 🎉\nNow forward the poll this message applies to.\n"
-            "If you sent this message by mistake, send another message to overwrite it."
+            "If you sent this message by mistake, use /undo to reset it."
         )
 
     @bot.message_handler(content_types=['poll'])
