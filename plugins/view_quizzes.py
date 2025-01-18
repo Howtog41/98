@@ -1,6 +1,6 @@
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-def register_handlers(bot, saved_quizzes, creating_quizzes):
+def register_handlers(bot, saved_quizzes):
     @bot.message_handler(commands=['view_quizzes'])
     def view_quizzes(message):
         """Display all saved quizzes with options to edit or share."""
@@ -31,18 +31,25 @@ def register_handlers(bot, saved_quizzes, creating_quizzes):
         if not quiz:
             bot.answer_callback_query(call.id, "Quiz not found.")
             return
-        
-        # Send quiz details for editing
-        bot.send_message(
-            call.message.chat.id,
-            f"Editing Quiz: **{quiz['title']}**\n\n"
-            f"1️⃣ **Title**: {quiz['title']}\n"
-            f"2️⃣ **Questions**: {len(quiz['questions'])}\n"
-            f"3️⃣ **Duration**: {quiz['timer']} seconds\n\n"
-            f"Send a command to edit:\n"
-            f"/edit_title_{quiz_id} - Edit Title\n"
-            f"/edit_questions_{quiz_id} - Edit Questions\n"
-            f"/edit_timer_{quiz_id} - Edit Timer",
+
+        # Update the current message instead of sending a new one
+        markup = InlineKeyboardMarkup()
+        markup.row(
+            InlineKeyboardButton("✏️ Edit Title", callback_data=f"edit_title_{quiz_id}"),
+            InlineKeyboardButton("📄 Edit Questions", callback_data=f"edit_questions_{quiz_id}"),
+            InlineKeyboardButton("⏳ Edit Timer", callback_data=f"edit_timer_{quiz_id}")
+        )
+        markup.row(InlineKeyboardButton("🔙 Back", callback_data="view_quizzes"))
+        bot.edit_message_text(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            text=(
+                f"📋 **Editing Quiz**: {quiz['title']}\n\n"
+                f"📝 **Questions**: {len(quiz['questions'])}\n"
+                f"⏳ **Timer**: {quiz['timer']} seconds\n\n"
+                f"Choose an option to edit:"
+            ),
+            reply_markup=markup,
             parse_mode="Markdown"
         )
 
@@ -54,69 +61,22 @@ def register_handlers(bot, saved_quizzes, creating_quizzes):
         if not quiz:
             bot.answer_callback_query(call.id, "Quiz not found.")
             return
-        
-        # Generate a shareable link (placeholder for actual implementation)
-        share_link = f"https://your-quiz-platform.com/quiz/{quiz_id}"  # Replace with actual URL structure
-        bot.send_message(
-            call.message.chat.id,
-            f"🔗 **Shareable Link for Quiz**: {quiz['title']}\n\n"
-            f"📍 [Click here to take the quiz!]({share_link})",
+
+        # Generate a bot-specific shareable link
+        bot_username = bot.get_me().username
+        share_link = f"https://t.me/{bot_username}?start={quiz_id}"
+        bot.edit_message_text(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            text=(
+                f"🔗 **Shareable Link for Quiz**: {quiz['title']}\n\n"
+                f"📍 [Click here to take the quiz!]({share_link})"
+            ),
             parse_mode="Markdown"
         )
 
-    @bot.message_handler(func=lambda message: message.text.startswith("/edit_title_"))
-    def edit_quiz_title(message):
-        """Edit the title of the quiz."""
-        quiz_id = message.text.split("_", 2)[2]
-        quiz = saved_quizzes.get(quiz_id)
-        if not quiz:
-            bot.send_message(message.chat.id, "Quiz not found.")
-            return
-        
-        bot.send_message(message.chat.id, "Send the new title for the quiz.")
-        bot.register_next_step_handler(message, lambda msg: save_new_title(msg, quiz_id))
-
-    def save_new_title(message, quiz_id):
-        """Save the new title for the quiz."""
-        new_title = message.text
-        saved_quizzes[quiz_id]["title"] = new_title
-        bot.send_message(message.chat.id, f"Quiz title updated to: **{new_title}**", parse_mode="Markdown")
-
-    @bot.message_handler(func=lambda message: message.text.startswith("/edit_questions_"))
-    def edit_quiz_questions(message):
-        """Edit the questions in the quiz."""
-        quiz_id = message.text.split("_", 2)[2]
-        quiz = saved_quizzes.get(quiz_id)
-        if not quiz:
-            bot.send_message(message.chat.id, "Quiz not found.")
-            return
-        
-        bot.send_message(
-            message.chat.id,
-            "Current questions:\n\n" +
-            "\n".join([f"{i+1}. {q['question']}" for i, q in enumerate(quiz["questions"])]) +
-            "\n\nSend a new poll to replace the questions, or use /add_question_{quiz_id} to add more."
-        )
-
-    @bot.message_handler(func=lambda message: message.text.startswith("/edit_timer_"))
-    def edit_quiz_timer(message):
-        """Edit the timer of the quiz."""
-        quiz_id = message.text.split("_", 2)[2]
-        quiz = saved_quizzes.get(quiz_id)
-        if not quiz:
-            bot.send_message(message.chat.id, "Quiz not found.")
-            return
-        
-        bot.send_message(message.chat.id, "Send the new timer in seconds.")
-        bot.register_next_step_handler(message, lambda msg: save_new_timer(msg, quiz_id))
-
-    def save_new_timer(message, quiz_id):
-        """Save the new timer for the quiz."""
-        try:
-            new_timer = int(message.text)
-            if new_timer <= 0:
-                raise ValueError
-            saved_quizzes[quiz_id]["timer"] = new_timer
-            bot.send_message(message.chat.id, f"Quiz timer updated to: **{new_timer} seconds**", parse_mode="Markdown")
-        except ValueError:
-            bot.send_message(message.chat.id, "Invalid timer. Please send a positive number.")
+    @bot.callback_query_handler(func=lambda call: call.data == "view_quizzes")
+    def back_to_view(call):
+        """Go back to the list of quizzes."""
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        view_quizzes(call.message)
