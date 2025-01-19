@@ -10,7 +10,7 @@ BOT_TOKEN = '7646738501:AAFzHOOyPfJcE_3t4fjwGSd1FKhqwa4hcOo'
 bot = telebot.TeleBot(BOT_TOKEN)
 
 # MongoDB connection
-MONGO_URI = "mongodb+srv://latestkoreandraama:<UjebJR51Dki7Ili2>@cluster0.nnnuejc.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+MONGO_URI = "mongodb+srv://latestkoreandraama:UjebJR51Dki7Ili2@cluster0.nnnuejc.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 client = MongoClient(MONGO_URI)
 db = client['quiz_bot']
 
