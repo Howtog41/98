@@ -112,7 +112,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes):
             return
 
         bot_username = bot.get_me().username
-        share_link = f"https://t.me/{bot_username}?start={quiz_id}"
+        share_link = f"https://t.me/{bot_username}?start=quiz_{quiz_id}}"
         markup = InlineKeyboardMarkup()
         markup.row(InlineKeyboardButton("🔙 Back", callback_data=f"view_quiz_{quiz_id}"))
 
