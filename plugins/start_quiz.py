@@ -78,7 +78,8 @@ def register_handlers(bot, saved_quizzes, creating_quizzes):
             "chat_id": chat_id,
             "score": 0,
             "current_question_index": 0,
-            "start_time": time.time()
+            "start_time": time.time(),
+            "end_time": time.time() + quiz["timer"]
         }
 
         bot.send_message(chat_id, "🚀 The quiz is starting now! Good luck! 🎉")
