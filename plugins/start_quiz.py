@@ -29,9 +29,27 @@ def register_handlers(bot, saved_quizzes, creating_quizzes):
             bot.send_message(chat_id, f"No quiz found with ID: {quiz_id}")
             return
 
+        # Quiz details message
+        quiz_title = f"**{quiz.get('title', 'Quiz')}**"
+        total_questions = len(quiz["questions"])
+        marks_per_question = quiz.get("marks_per_question", 1)
+        total_marks = total_questions * marks_per_question
+        duration = quiz["timer"]
+
+        message = (
+            f"📝 **Quiz Details**:\n\n"
+            f"📚 Title: {quiz_title}\n"
+            f"🔢 Total Questions: {total_questions}\n"
+            f"✅ Marks per Question: {marks_per_question}\n"
+            f"🎯 Total Marks: {total_marks}\n"
+            f"⏳ Time Allowed: {duration // 60} minutes and {duration % 60} seconds\n\n"
+            f"🚀 Ready to start? Click **I'm Ready** to begin!"
+        )
+
+        # Inline keyboard for confirmation
         markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton("I'm Ready", callback_data=f"start_quiz_{quiz_id}"))
-        bot.send_message(chat_id, "Are you ready to start the quiz?", reply_markup=markup)
+        markup.add(InlineKeyboardButton("✔️ I'm Ready", callback_data=f"start_quiz_{quiz_id}"))
+        bot.send_message(chat_id, message, reply_markup=markup, parse_mode="Markdown")
 
     @bot.callback_query_handler(func=lambda call: call.data.startswith("start_quiz_"))
     def handle_start_quiz(call):
