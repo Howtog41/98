@@ -6,7 +6,7 @@ active_quizzes = {}
 lock = threading.Lock()  # Thread-safe lock for active_quizzes
 saved_quizzes = {}
 
-def register_handlers(bot):
+def register_handlers(bot, saved_quizzes, creating_quizzes):
     @bot.message_handler(commands=["start"])
     def start_handler(message):
         """Handle the /start command with quiz ID."""
