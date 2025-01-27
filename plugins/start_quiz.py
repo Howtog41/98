@@ -4,7 +4,7 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from threading import Lock
 
 active_quizzes = {}
-active_quizzes_lock = Lock()
+lock = threading.Lock()
 saved_quizzes = {}
 def register_handlers(bot, saved_quizzes, creating_quizzes):
     @bot.message_handler(commands=["start"])
