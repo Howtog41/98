@@ -2,6 +2,7 @@ import threading
 import time
 
 active_quizzes = {}
+active_quizzes_lock = Lock()
 saved_quizzes = {}
 def register_handlers(bot, saved_quizzes, creating_quizzes):
     @bot.message_handler(commands=["start"])
