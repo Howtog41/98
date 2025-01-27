@@ -1,5 +1,6 @@
 import threading
 import time
+from threading import Lock
 
 active_quizzes = {}
 active_quizzes_lock = Lock()
