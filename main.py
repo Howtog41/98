@@ -3,7 +3,7 @@ import importlib
 from telebot import TeleBot
 
 # Replace with your bot token
-BOT_TOKEN = '7646738501:AAFzHOOyPfJcE_3t4fjwGSd1FKhqwa4hcOo'
+BOT_TOKEN = '7961958205:AAHX-UoP5dHLUJLKOM_QtW0ayENLoxNguHI'
 bot = TeleBot(BOT_TOKEN)
 
 saved_quizzes = {}  # To store all quizzes
