@@ -3,11 +3,28 @@ import time
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 active_quizzes = {}
-lock = threading.Lock()
-saved_quizzes = {}
-user_results = {}  # Store user results for leaderboard and admin review
+lock = threading.Lock()  # Thread-safe lock for active_quizzes
+saved_quizzes = {
+    "1": {
+        "timer": 3600,  # Timer in seconds (1 hour)
+        "questions": [
+            {
+                "question": "What is the capital of France?",
+                "options": ["Berlin", "Madrid", "Paris", "Rome"],
+                "correct_option_id": 2,
+                "explanation": "Paris is the capital of France."
+            },
+            {
+                "question": "What is 2 + 2?",
+                "options": ["3", "4", "5", "6"],
+                "correct_option_id": 1,
+                "explanation": "2 + 2 equals 4."
+            }
+        ]
+    }
+}
 
-def register_handlers(bot, saved_quizzes, creating_quizzes):
+def register_handlers(bot):
     @bot.message_handler(commands=["start"])
     def start_handler(message):
         """Handle the /start command with quiz ID."""
@@ -30,16 +47,9 @@ def register_handlers(bot, saved_quizzes, creating_quizzes):
             bot.send_message(chat_id, f"No quiz found with ID: {quiz_id}")
             return
 
-        details = (
-            f"📋 **Quiz Details**:\n"
-            f"Title: {quiz['title']}\n"
-            f"Questions: {len(quiz['questions'])}\n"
-            f"Time: {quiz['timer']} seconds\n"
-        )
-
         markup = InlineKeyboardMarkup()
         markup.add(InlineKeyboardButton("I'm Ready", callback_data=f"start_quiz_{quiz_id}"))
-        bot.send_message(chat_id, details + "Are you ready to start the quiz?", reply_markup=markup, parse_mode="Markdown")
+        bot.send_message(chat_id, "Are you ready to start the quiz?", reply_markup=markup)
 
     @bot.callback_query_handler(func=lambda call: call.data.startswith("start_quiz_"))
     def handle_start_quiz(call):
@@ -67,7 +77,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes):
                 "score": 0,
                 "current_question_index": 0,
                 "start_time": time.time(),
-                "end_time": time.time() + quiz["timer"],
+                "end_time": time.time() + quiz["timer"]
             }
 
         bot.send_message(chat_id, "The quiz is starting now! Good luck!")
@@ -84,7 +94,8 @@ def register_handlers(bot, saved_quizzes, creating_quizzes):
                 hours, minutes = divmod(remaining_time, 3600)
                 minutes, seconds = divmod(minutes, 60)
                 time_str = f"{hours:02}:{minutes:02}"
-                bot.send_message(chat_id, f"⏳ Time left: {remaining_time} seconds")
+                bot.send_message(chat_id, f"⏳ Time left: {time_str}")
+
             time.sleep(1)
 
             # Check if the quiz was completed manually
@@ -109,15 +120,6 @@ def register_handlers(bot, saved_quizzes, creating_quizzes):
             return
 
         question = questions[question_index]
-        if "pre_poll_message" in quiz and question_index == 0:
-            pre_poll = quiz["pre_poll_message"]
-            if pre_poll["type"] == "text":
-                bot.send_message(chat_id, pre_poll["content"])
-            elif pre_poll["type"] == "photo":
-                bot.send_photo(chat_id, pre_poll["content"])
-            elif pre_poll["type"] == "video":
-                bot.send_video(chat_id, pre_poll["content"])
-
         bot.send_poll(
             chat_id,
             question["question"],
@@ -141,39 +143,25 @@ def register_handlers(bot, saved_quizzes, creating_quizzes):
         quiz_id = quiz_data["quiz_id"]
         total_questions = len(saved_quizzes[quiz_id]["questions"])
 
-        # Save the first attempt for the leaderboard
-        user_results.setdefault(quiz_id, {})
-        if chat_id not in user_results[quiz_id]:
-            user_results[quiz_id][chat_id] = score
+        bot.send_message(chat_id, f"🎉 Quiz completed! Your score: {score}/{total_questions}")
 
-        # Calculate rank and total participants
-        scores = list(user_results[quiz_id].values())
-        scores.sort(reverse=True)
-        rank = scores.index(score) + 1
+    @bot.poll_answer_handler()
+    def handle_poll_answer(poll_answer):
+        """Handle user answers and send the next question."""
+        user_id = poll_answer.user.id
+        with lock:
+            if user_id not in active_quizzes:
+                return
 
-        bot.send_message(
-            chat_id,
-            f"🎉 Quiz completed! Your score: {score}/{total_questions}\n"
-            f"📊 Rank: {rank}/{len(scores)} participants.",
-        )
+            quiz_data = active_quizzes[user_id]
+            quiz_id = quiz_data["quiz_id"]
+            question_index = quiz_data.get("current_question_index", 0)
 
-    @bot.message_handler(commands=["quiz_stats"])
-    def handle_quiz_stats(message):
-        """Admin command to view quiz stats by quiz ID."""
-        chat_id = message.chat.id
-        args = message.text.split()
-        if len(args) != 2:
-            bot.send_message(chat_id, "Usage: /quiz_stats <quiz_id>")
-            return
+            # Check answer correctness
+            correct_option_id = saved_quizzes[quiz_id]["questions"][question_index]["correct_option_id"]
+            if poll_answer.option_ids[0] == correct_option_id:
+                quiz_data["score"] += 1
 
-        quiz_id = args[1]
-        if quiz_id not in user_results:
-            bot.send_message(chat_id, f"No data found for quiz ID: {quiz_id}")
-            return
-
-        stats = user_results[quiz_id]
-        result = f"📊 Quiz Stats for ID: {quiz_id}\n"
-        result += "\n".join([f"User {user}: {score}" for user, score in stats.items()])
-        bot.send_message(chat_id, result)
-
-    
+            # Move to next question
+            quiz_data["current_question_index"] += 1
+            send_question(bot, quiz_data["chat_id"], quiz_id, quiz_data["current_question_index"])
