@@ -113,7 +113,7 @@ def view_quizzes(message):
     chat_id = message.chat.id
     quizzes = quizzes_collection.find({"chat_id": chat_id, "status": "ready"})
 
-    if quizzes.count() == 0:
+    if quizzes.count == 0:
         bot.send_message(chat_id, "No quizzes available.")
         return
 
