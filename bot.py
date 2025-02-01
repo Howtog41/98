@@ -111,12 +111,16 @@ def set_quiz_timer(message):
 @bot.message_handler(commands=['view_quizzes'])
 def view_quizzes(message):
     chat_id = message.chat.id
-    quizzes = quizzes_collection.find({"chat_id": chat_id, "status": "ready"})
-
-    if quizzes.count == 0:
+    # Use count_documents to check the number of matching documents
+    count = quizzes_collection.count_documents({"chat_id": chat_id, "status": "ready"})
+    
+    if count == 0:
         bot.send_message(chat_id, "No quizzes available.")
         return
 
+    # Retrieve the matching quizzes
+    quizzes = quizzes_collection.find({"chat_id": chat_id, "status": "ready"})
+    
     response = "Your Quizzes:\n\n"
     for quiz in quizzes:
         title = quiz["title"]
@@ -124,6 +128,7 @@ def view_quizzes(message):
         response += f"{title} 📝 {questions_count} Questions\nStart: /start_{quiz['quiz_id']}\n\n"
 
     bot.send_message(chat_id, response)
+
 
 # Start a quiz
 @bot.message_handler(func=lambda message: message.text.startswith("/start_"))
