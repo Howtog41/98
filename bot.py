@@ -6,7 +6,7 @@ import time
 from pymongo import MongoClient
 
 # Telegram Bot Token
-BOT_TOKEN = '7646738501:AAFzHOOyPfJcE_3t4fjwGSd1FKhqwa4hcOo'
+BOT_TOKEN = '8151017957:AAEhEOxbwjnw6Fxu1GzPwHTVhUeIpibpJqI'
 bot = telebot.TeleBot(BOT_TOKEN)
 
 # MongoDB connection
