@@ -5,6 +5,9 @@ import string
 import time
 from pymongo import MongoClient
 
+
+active_timers = {}
+
 # Telegram Bot Token
 BOT_TOKEN = '8151017957:AAEhEOxbwjnw6Fxu1GzPwHTVhUeIpibpJqI'
 bot = telebot.TeleBot(BOT_TOKEN)
@@ -155,18 +158,40 @@ def start_quiz(message):
     start_timer(chat_id, quiz_id, quiz["timer"])
     send_question(chat_id, quiz_id, 0)
 
-# Timer function
+
 def start_timer(chat_id, quiz_id, duration):
-    threading.Thread(target=quiz_timer, args=(chat_id, quiz_id, duration)).start()
+    """
+    Starts the quiz timer in a separate thread and keeps track of active timers.
+    """
+    timer_thread = threading.Thread(target=quiz_timer, args=(chat_id, quiz_id, duration))
+    timer_thread.daemon = True  # Ensures the thread exits when the main program ends
+    active_timers[chat_id] = timer_thread
+    timer_thread.start()
 
 def quiz_timer(chat_id, quiz_id, duration):
+    """
+    Handles the countdown for the quiz and ends the quiz when the timer expires.
+    """
     for remaining_time in range(duration, 0, -1):
+        # If the quiz is already finished (by the user), stop the timer
+        session = sessions_collection.find_one({"chat_id": chat_id, "quiz_id": quiz_id, "status": "active"})
+        if not session:  # If the session is not active, stop the timer
+            return
+
+        # Send periodic time updates
         if remaining_time % 30 == 0 or remaining_time <= 10:
             bot.send_message(chat_id, f"⏳ Time left: {remaining_time} seconds")
         time.sleep(1)
 
+    # Time's up, end the quiz
     bot.send_message(chat_id, "⏰ Time's up! The quiz has ended.")
     finish_quiz(chat_id)
+
+    # Clean up the timer from active timers
+    active_timers.pop(chat_id, None)
+
+
+
 
 # Send a question
 def send_question(chat_id, quiz_id, question_index):
@@ -234,22 +259,23 @@ def finish_quiz(chat_id):
 
     bot.send_message(chat_id, f"Quiz completed! 🎉\nYour score: {score}")
 
-    # Leaderboard update
+    # Update the leaderboard
     leaderboard_collection.update_one(
         {"quiz_id": quiz_id},
         {"$push": {"scores": {"user_id": chat_id, "score": score}}},
         upsert=True
     )
 
-    # Show leaderboard
+    # Show the leaderboard
     show_leaderboard(chat_id, quiz_id)
 
-    # Allow viewing unanswered questions
+    # Offer to view unanswered questions
     if unanswered:
         markup = telebot.types.InlineKeyboardMarkup()
         markup.add(telebot.types.InlineKeyboardButton("View Unanswered", callback_data=f"view_unanswered_{quiz_id}"))
         bot.send_message(chat_id, "You left some questions unanswered. Click below to review them.", reply_markup=markup)
 
+    # Clean up the session
     sessions_collection.delete_one({"chat_id": chat_id, "status": "active"})
 
 # Show leaderboard
@@ -259,28 +285,40 @@ def show_leaderboard(chat_id, quiz_id):
         bot.send_message(chat_id, "No leaderboard data available.")
         return
 
+    # Sort scores in descending order and handle ties
     sorted_scores = sorted(leaderboard["scores"], key=lambda x: x["score"], reverse=True)
     response = f"🏆 Leaderboard for Quiz {quiz_id}:\n\n"
+    rank = 1
+    previous_score = None
 
-    for rank, entry in enumerate(sorted_scores, start=1):
-        response += f"{rank}. User {entry['user_id']}: {entry['score']} points\n"
+    for i, entry in enumerate(sorted_scores):
+        # Assign rank only if the score is different from the previous score
+        if previous_score != entry["score"]:
+            rank = i + 1
+
+        user_id = entry["user_id"]
+        user_info = bot.get_chat(user_id)  # Fetch user details for a better display
+        user_name = user_info.username or user_info.first_name or "User"
+
+        response += f"{rank}. {user_name}: {entry['score']} points\n"
+        previous_score = entry["score"]
 
     bot.send_message(chat_id, response)
 
-# View unanswered questions
+# Callback handler for viewing unanswered questions
 @bot.callback_query_handler(func=lambda call: call.data.startswith("view_unanswered_"))
-def view_unanswered(call):
-    chat_id = call.message.chat.id
+def view_unanswered_questions(call):
     quiz_id = call.data.split("_", 2)[2]
-    session = sessions_collection.find_one({"chat_id": chat_id, "quiz_id": quiz_id, "status": "completed"})
+    session = sessions_collection.find_one({"chat_id": call.message.chat.id, "quiz_id": quiz_id, "status": "finished"})
 
     if not session or not session.get("unanswered"):
-        bot.send_message(chat_id, "No unanswered questions available.")
+        bot.answer_callback_query(call.id, "No unanswered questions to display.")
         return
 
     unanswered = session["unanswered"]
-    for question in unanswered:
-        bot.send_message(chat_id, f"❓ {question}")
+    response = "🔍 Unanswered Questions:\n\n" + "\n".join(unanswered)
+    bot.send_message(call.message.chat.id, response)
+
 
 # Run the bot
 bot.infinity_polling()
