@@ -203,4 +203,102 @@ def send_question(chat_id, quiz_id, question_index):
 # Handle poll answers
 @bot.poll_answer_handler(func=lambda poll_answer: True)
 def handle_poll_answer(poll_answer):
-    chat_id =
+    chat_id = poll_answer.user.id
+    session = sessions_collection.find_one({"chat_id": chat_id, "status": "active"})
+
+    if not session:
+        return
+
+    quiz_id = session["quiz_id"]
+    current_question = session["current_question"]
+    quiz = quizzes_collection.find_one({"quiz_id": quiz_id})
+
+    if poll_answer.option_ids[0] == quiz["questions"][current_question]["correct_option_id"]:
+        sessions_collection.update_one(
+            {"chat_id": chat_id, "quiz_id": quiz_id, "status": "active"},
+            {"$inc": {"score": 1}}
+        )
+    else:
+        sessions_collection.update_one(
+            {"chat_id": chat_id, "quiz_id": quiz_id, "status": "active"},
+            {"$push": {"unanswered": quiz["questions"][current_question]["question"]}}
+        )
+
+    send_question(chat_id, quiz_id, current_question + 1)
+
+# Finish the quiz
+def finish_quiz(chat_id):
+    session = sessions_collection.find_one({"chat_id": chat_id, "status": "active"})
+
+    if not session:
+        return
+
+    quiz_id = session["quiz_id"]
+    score = session["score"]
+    unanswered = session.get("unanswered", [])
+
+    bot.send_message(chat_id, f"Quiz completed! 🎉\nYour score: {score}")
+
+    # Update the leaderboard
+    leaderboard_collection.update_one(
+        {"quiz_id": quiz_id},
+        {"$push": {"scores": {"user_id": chat_id, "score": score}}},
+        upsert=True
+    )
+
+    # Show the leaderboard
+    show_leaderboard(chat_id, quiz_id)
+
+    # Offer to view unanswered questions
+    if unanswered:
+        markup = telebot.types.InlineKeyboardMarkup()
+        markup.add(telebot.types.InlineKeyboardButton("View Unanswered", callback_data=f"view_unanswered_{quiz_id}"))
+        bot.send_message(chat_id, "You left some questions unanswered. Click below to review them.", reply_markup=markup)
+
+    # Clean up the session
+    sessions_collection.delete_one({"chat_id": chat_id, "status": "active"})
+
+# Show leaderboard
+def show_leaderboard(chat_id, quiz_id):
+    leaderboard = leaderboard_collection.find_one({"quiz_id": quiz_id})
+    if not leaderboard or not leaderboard.get("scores"):
+        bot.send_message(chat_id, "No leaderboard data available.")
+        return
+
+    # Sort scores in descending order and handle ties
+    sorted_scores = sorted(leaderboard["scores"], key=lambda x: x["score"], reverse=True)
+    response = f"🏆 Leaderboard for Quiz {quiz_id}:\n\n"
+    rank = 1
+    previous_score = None
+
+    for i, entry in enumerate(sorted_scores):
+        # Assign rank only if the score is different from the previous score
+        if previous_score != entry["score"]:
+            rank = i + 1
+
+        user_id = entry["user_id"]
+        user_info = bot.get_chat(user_id)  # Fetch user details for a better display
+        user_name = user_info.username or user_info.first_name or "User"
+
+        response += f"{rank}. {user_name}: {entry['score']} points\n"
+        previous_score = entry["score"]
+
+    bot.send_message(chat_id, response)
+
+# Callback handler for viewing unanswered questions
+@bot.callback_query_handler(func=lambda call: call.data.startswith("view_unanswered_"))
+def view_unanswered_questions(call):
+    quiz_id = call.data.split("_", 2)[2]
+    session = sessions_collection.find_one({"chat_id": call.message.chat.id, "quiz_id": quiz_id, "status": "finished"})
+
+    if not session or not session.get("unanswered"):
+        bot.answer_callback_query(call.id, "No unanswered questions to display.")
+        return
+
+    unanswered = session["unanswered"]
+    response = "🔍 Unanswered Questions:\n\n" + "\n".join(unanswered)
+    bot.send_message(call.message.chat.id, response)
+
+
+# Run the bot
+bot.infinity_polling()
