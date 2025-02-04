@@ -4,6 +4,9 @@ import random
 import string
 import time
 from pymongo import MongoClient
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+
 
 
 active_timers = {}
@@ -134,14 +137,42 @@ def view_quizzes(message):
 
 
 # Start a quiz
-@bot.message_handler(func=lambda message: message.text.startswith("/start_"))
+
+
 def start_quiz(message):
+    """Handle /start_<quiz_id> command."""
     chat_id = message.chat.id
     quiz_id = message.text.split("_", 1)[1]
     quiz = quizzes_collection.find_one({"quiz_id": quiz_id, "status": "ready"})
 
     if not quiz:
         bot.send_message(chat_id, f"No quiz found with ID: {quiz_id}")
+        return
+
+    # Send "Ready" confirmation
+    ask_user_ready(chat_id, quiz_id)
+
+def ask_user_ready(chat_id, quiz_id):
+    """Ask user if they're ready to start the quiz."""
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton("I'm Ready", callback_data=f"start_quiz_{quiz_id}"))
+    bot.send_message(chat_id, "Are you ready to start the quiz?", reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("start_quiz_"))
+def handle_start_quiz(call):
+    """Handle 'I'm Ready' button click."""
+    quiz_id = call.data.split("_", 2)[2]
+    chat_id = call.message.chat.id
+    quiz = quizzes_collection.find_one({"quiz_id": quiz_id, "status": "ready"})
+
+    if not quiz:
+        bot.send_message(chat_id, f"No quiz found with ID: {quiz_id}")
+        return
+
+    session = sessions_collection.find_one({"chat_id": chat_id, "quiz_id": quiz_id, "status": "active"})
+
+    if session:
+        bot.send_message(chat_id, "You're already in a quiz! Finish it first before starting a new one.")
         return
 
     # Initialize session
@@ -154,47 +185,40 @@ def start_quiz(message):
         "status": "active"
     })
 
-    bot.send_message(chat_id, f"The quiz is starting now! Good luck!")
+    bot.send_message(chat_id, "The quiz is starting now! Good luck!")
     start_timer(chat_id, quiz_id, quiz["timer"])
     send_question(chat_id, quiz_id, 0)
 
-
 def start_timer(chat_id, quiz_id, duration):
-    """
-    Starts the quiz timer in a separate thread and keeps track of active timers.
-    """
+    """Start a quiz timer."""
     timer_thread = threading.Thread(target=quiz_timer, args=(chat_id, quiz_id, duration))
-    timer_thread.daemon = True  # Ensures the thread exits when the main program ends
+    timer_thread.daemon = True
     active_timers[chat_id] = timer_thread
     timer_thread.start()
 
 def quiz_timer(chat_id, quiz_id, duration):
-    """
-    Handles the countdown for the quiz and ends the quiz when the timer expires.
-    """
-    for remaining_time in range(duration, 0, -1):
-        # If the quiz is already finished (by the user), stop the timer
-        session = sessions_collection.find_one({"chat_id": chat_id, "quiz_id": quiz_id, "status": "active"})
-        if not session:  # If the session is not active, stop the timer
-            return
+    """Handle countdown and auto-submit when time expires."""
+    end_time = time.time() + duration
 
-        # Send periodic time updates
+    while time.time() < end_time:
+        remaining_time = int(end_time - time.time())
+
         if remaining_time % 30 == 0 or remaining_time <= 10:
             bot.send_message(chat_id, f"⏳ Time left: {remaining_time} seconds")
+
         time.sleep(1)
 
-    # Time's up, end the quiz
+        # Check if quiz is manually ended
+        session = sessions_collection.find_one({"chat_id": chat_id, "quiz_id": quiz_id, "status": "active"})
+        if not session:
+            return
+
     bot.send_message(chat_id, "⏰ Time's up! The quiz has ended.")
     finish_quiz(chat_id)
-
-    # Clean up the timer from active timers
     active_timers.pop(chat_id, None)
 
-
-
-
-# Send a question
 def send_question(chat_id, quiz_id, question_index):
+    """Send a quiz question."""
     quiz = quizzes_collection.find_one({"quiz_id": quiz_id, "status": "ready"})
     questions = quiz["questions"]
 
@@ -203,8 +227,6 @@ def send_question(chat_id, quiz_id, question_index):
         return
 
     question = questions[question_index]
-    session = sessions_collection.find_one({"chat_id": chat_id, "quiz_id": quiz_id, "status": "active"})
-
     sessions_collection.update_one(
         {"chat_id": chat_id, "quiz_id": quiz_id, "status": "active"},
         {"$set": {"current_question": question_index}}
@@ -220,9 +242,9 @@ def send_question(chat_id, quiz_id, question_index):
         explanation=question["explanation"]
     )
 
-# Poll answer handler
 @bot.poll_answer_handler(func=lambda poll_answer: True)
 def handle_poll_answer(poll_answer):
+    """Handle user's poll answers."""
     chat_id = poll_answer.user.id
     session = sessions_collection.find_one({"chat_id": chat_id, "status": "active"})
 
@@ -246,8 +268,8 @@ def handle_poll_answer(poll_answer):
 
     send_question(chat_id, quiz_id, current_question + 1)
 
-# Finish the quiz
 def finish_quiz(chat_id):
+    """Finalize and show quiz results."""
     session = sessions_collection.find_one({"chat_id": chat_id, "status": "active"})
 
     if not session:
@@ -259,23 +281,19 @@ def finish_quiz(chat_id):
 
     bot.send_message(chat_id, f"Quiz completed! 🎉\nYour score: {score}")
 
-    # Update the leaderboard
     leaderboard_collection.update_one(
         {"quiz_id": quiz_id},
         {"$push": {"scores": {"user_id": chat_id, "score": score}}},
         upsert=True
     )
 
-    # Show the leaderboard
     show_leaderboard(chat_id, quiz_id)
 
-    # Offer to view unanswered questions
     if unanswered:
-        markup = telebot.types.InlineKeyboardMarkup()
-        markup.add(telebot.types.InlineKeyboardButton("View Unanswered", callback_data=f"view_unanswered_{quiz_id}"))
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton("View Unanswered", callback_data=f"view_unanswered_{quiz_id}"))
         bot.send_message(chat_id, "You left some questions unanswered. Click below to review them.", reply_markup=markup)
 
-    # Clean up the session
     sessions_collection.delete_one({"chat_id": chat_id, "status": "active"})
 
 # Show leaderboard
