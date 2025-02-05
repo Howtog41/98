@@ -25,8 +25,6 @@ def load_plugins():
                 module.register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db)
 
 if __name__ == "__main__":
-    # Load quizzes from MongoDB
-    fetch_quizzes()
-
+  
     print("Bot is running...")
     bot.infinity_polling()
