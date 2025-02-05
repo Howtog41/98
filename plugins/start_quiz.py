@@ -81,6 +81,9 @@ def register_handlers(bot, saved_quizzes, creating_quizzes):
         while time.time() < end_time:
             remaining_time = int(end_time - time.time())
             if remaining_time % 30 == 0 or remaining_time <= 10:
+                hours, minutes = divmod(remaining_time, 3600)
+                minutes, seconds = divmod(minutes, 60)
+                time_str = f"{hours:02}:{minutes:02}"
                 bot.send_message(chat_id, f"⏳ Time left: {remaining_time} seconds")
             time.sleep(1)
 
@@ -122,7 +125,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes):
             type="quiz",
             correct_option_id=question["correct_option_id"],
             is_anonymous=False,
-            explanation=question.get("explanation", "No explanation provided."),
+            explanation=question["explanation"]
         )
 
     def finalize_quiz(bot, chat_id):
@@ -173,17 +176,4 @@ def register_handlers(bot, saved_quizzes, creating_quizzes):
         result += "\n".join([f"User {user}: {score}" for user, score in stats.items()])
         bot.send_message(chat_id, result)
 
-    @bot.message_handler(commands=["set_pre_poll"])
-    def set_individual_pre_poll_message(message):
-        """Set a pre-poll message for the quiz."""
-        chat_id = message.chat.id
-        if message.content_type == "text":
-            creating_quizzes[chat_id]["pre_poll_message"] = {"type": "text", "content": message.text}
-        elif message.content_type == "photo":
-            file_id = message.photo[-1].file_id
-            creating_quizzes[chat_id]["pre_poll_message"] = {"type": "photo", "content": file_id}
-        elif message.content_type == "video":
-            file_id = message.video.file_id
-            creating_quizzes[chat_id]["pre_poll_message"] = {"type": "video", "content": file_id}
-
-        bot.send_message(chat_id, "Pre-poll message saved!")
+    
