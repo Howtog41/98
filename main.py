@@ -1,18 +1,13 @@
 import os
 import importlib
-
 from telebot import TeleBot
 
 # Replace with your bot token
-BOT_TOKEN = '8151017957:AAEhEOxbwjnw6Fxu1GzPwHTVhUeIpibpJqI'
+BOT_TOKEN = '7961958205:AAHX-UoP5dHLUJLKOM_QtW0ayENLoxNguHI'
 bot = TeleBot(BOT_TOKEN)
 
-
-# Load quizzes from MongoDB on startup
-saved_quizzes = {}  # To store all quizzes in memory
-creating_quizzes = {}  # Temporary in-memory storage for ongoing quizzes
-
-
+saved_quizzes = {}  # To store all quizzes
+creating_quizzes = {}
 
 # Dynamically load plugins
 def load_plugins():
@@ -22,9 +17,9 @@ def load_plugins():
             module_name = f"{plugin_folder}.{file[:-3]}"
             module = importlib.import_module(module_name)
             if hasattr(module, 'register_handlers'):
-                module.register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db)
+                module.register_handlers(bot, saved_quizzes, creating_quizzes)
 
 if __name__ == "__main__":
-  
+    load_plugins()
     print("Bot is running...")
     bot.infinity_polling()
