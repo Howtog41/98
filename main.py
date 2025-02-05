@@ -8,7 +8,7 @@ BOT_TOKEN = '7961958205:AAHX-UoP5dHLUJLKOM_QtW0ayENLoxNguHI'
 bot = TeleBot(BOT_TOKEN)
 
 # MongoDB connection setup
-MONGO_URI = "mongodb+srv://<username>:<password>@cluster0.mongodb.net/mydatabase?retryWrites=true&w=majority"
+MONGO_URI = "mongodb+srv://latestkoreandraama:UjebJR51Dki7Ili2@cluster0.nnnuejc.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 client = MongoClient(MONGO_URI)
 db = client['mydatabase']  # Replace 'mydatabase' with your database name
 quizzes_collection = db['quizzes']  # Collection for storing quizzes
