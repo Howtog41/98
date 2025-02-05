@@ -1,13 +1,16 @@
 import os
 import importlib
 from telebot import TeleBot
-
+from pymongo import MongoClient
 # Replace with your bot token
 BOT_TOKEN = '8151017957:AAEhEOxbwjnw6Fxu1GzPwHTVhUeIpibpJqI'
 bot = TeleBot(BOT_TOKEN)
+MONGO_URI = "mongodb+srv://latestkoreandraama:UjebJR51Dki7Ili2@cluster0.nnnuejc.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+client = MongoClient(MONGO_URI)
+db = client['quiz_bot']
 
-saved_quizzes = {}  # To store all quizzes
-creating_quizzes = {}
+saved_quizzes = db['quizzes'] # To store all quizzes
+creating_quizzes = db['sessions']
 
 # Dynamically load plugins
 def load_plugins():
