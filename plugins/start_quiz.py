@@ -91,9 +91,8 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
         while time.time() < end_time:
             remaining_time = int(end_time - time.time())
             if remaining_time % 30 == 0 or remaining_time <= 10:
-                hours, minutes = divmod(remaining_time, 3600)
-                minutes, seconds = divmod(minutes, 60)
-                time_str = f"{hours:02}:{minutes:02}"
+                minutes, seconds = divmod(remaining_time, 60)
+                time_str = f"{minutes:02}:{seconds:02}"
                 bot.send_message(chat_id, f"⏳ Time left: {time_str}")
 
             time.sleep(1)
@@ -144,6 +143,9 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
         total_questions = len(saved_quizzes[quiz_id]["questions"])
 
         bot.send_message(chat_id, f"🎉 Quiz completed! Your score: {score}/{total_questions}")
+
+        # Display leaderboard or final message (you can add more functionality here)
+        bot.send_message(chat_id, "📊 Thank you for participating in the quiz!")
 
     @bot.poll_answer_handler()
     def handle_poll_answer(poll_answer):
