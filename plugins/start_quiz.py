@@ -164,4 +164,10 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
 
             # Move to next question
             quiz_data["current_question_index"] += 1
-            send_question(bot, quiz_data["chat_id"], quiz_id, quiz_data["current_question_index"])
+            next_question_index = quiz_data["current_question_index"]
+
+            # Check if it's the last question
+            if next_question_index >= len(saved_quizzes[quiz_id]["questions"]):
+                finalize_quiz(bot, quiz_data["chat_id"])
+            else:
+                send_question(bot, quiz_data["chat_id"], quiz_id, next_question_index)
