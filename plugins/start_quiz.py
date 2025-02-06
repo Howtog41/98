@@ -102,6 +102,9 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             return
 
         question = questions[question_index]
+        print(f"Sending question: {question['question']}")
+        print(f"Options: {question['options']}")
+        print(f"Correct Option ID: {question['correct_option_id']}")
         bot.send_poll(
             chat_id,
             question["question"],
