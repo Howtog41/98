@@ -4,9 +4,27 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 active_quizzes = {}
 lock = threading.Lock()  # Thread-safe lock for active_quizzes
-saved_quizzes = {}
+saved_quizzes = {
+    "1": {
+        "timer": 3600,  # Timer in seconds (1 hour)
+        "questions": [
+            {
+                "question": "What is the capital of France?",
+                "options": ["Berlin", "Madrid", "Paris", "Rome"],
+                "correct_option_id": 2,
+                "explanation": "Paris is the capital of France."
+            },
+            {
+                "question": "What is 2 + 2?",
+                "options": ["3", "4", "5", "6"],
+                "correct_option_id": 1,
+                "explanation": "2 + 2 equals 4."
+            }
+        ]
+    }
+}
 
-def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
+def register_handlers(bot):
     @bot.message_handler(commands=["start"])
     def start_handler(message):
         """Handle the /start command with quiz ID."""
@@ -102,9 +120,6 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             return
 
         question = questions[question_index]
-        print(f"Sending question: {question['question']}")
-        print(f"Options: {question['options']}")
-        print(f"Correct Option ID: {question['correct_option_id']}")
         bot.send_poll(
             chat_id,
             question["question"],
