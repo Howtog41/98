@@ -62,6 +62,13 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             "If you sent this message by mistake, use /undo to reset it."
         )
 
+    def validate_correct_option_id(options, correct_option_id):
+        if 0 <= correct_option_id < len(options):
+            return correct_option_id
+        else:
+            raise ValueError(f"Invalid correct_option_id: {correct_option_id}. Options: {options}")
+
+    
     @bot.message_handler(content_types=['poll'])
     def handle_forwarded_poll(message):
         """Add a forwarded poll to the quiz, along with its pre-poll message."""
@@ -78,7 +85,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             "pre_poll_message": pre_poll_message,
             "question": poll.question,
             "options": [opt.text for opt in poll.options],
-            "correct_option_id": poll.correct_option_id,
+            "correct_option_id": validate_correct_option_id([opt.text for opt in poll.options], poll.correct_option_id),
             "explanation": poll.explanation or "No explanation provided."
         })
 
@@ -90,7 +97,8 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             f"Poll added: {poll.question}\nSend another pre-poll message (optional) or forward another poll.\n"
             "Type /done when you're finished."
         )
-
+    except ValueError as e:
+        bot.send_message(chat_id, f"Error: {e}")
     @bot.message_handler(commands=['done'])
     def finish_quiz_creation(message):
         """Complete the quiz creation process and ask for the timer."""
