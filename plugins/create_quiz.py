@@ -62,7 +62,12 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             "If you sent this message by mistake, use /undo to reset it."
         )
 
-    
+    def validate_correct_option_id(options, correct_option_id):
+        if 0 <= correct_option_id < len(options):
+            return correct_option_id
+        else:
+            raise ValueError(f"Invalid correct_option_id: {correct_option_id}. Options: {options}")
+
     
     @bot.message_handler(content_types=['poll'])
     def handle_forwarded_poll(message):
