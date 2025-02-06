@@ -97,8 +97,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             f"Poll added: {poll.question}\nSend another pre-poll message (optional) or forward another poll.\n"
             "Type /done when you're finished."
         )
-    except ValueError as e:
-        bot.send_message(chat_id, f"Error: {e}")
+   
     @bot.message_handler(commands=['done'])
     def finish_quiz_creation(message):
         """Complete the quiz creation process and ask for the timer."""
