@@ -109,9 +109,9 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
     def send_question(bot, chat_id, quiz_id, question_index):
         """Send a question to the user."""
         with lock:
-        if chat_id not in active_quizzes:
-            bot.send_message(chat_id, "Quiz session not initialized. Please restart the quiz.")
-            return
+            if chat_id not in active_quizzes:
+                bot.send_message(chat_id, "Quiz session not initialized. Please restart the quiz.")
+                return
             
         quiz = saved_quizzes.get(quiz_id)
         if not quiz:
