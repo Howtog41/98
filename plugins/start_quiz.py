@@ -151,25 +151,33 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
     def handle_poll_answer(poll_answer):
         """Handle user answers and send the next question."""
         user_id = poll_answer.user.id
+        print(f"Poll Answer Received: User ID {user_id}")
         with lock:
             if user_id not in active_quizzes:
+                print("User not in active_quizzes")
                 return
 
             quiz_data = active_quizzes[user_id]
             quiz_id = quiz_data["quiz_id"]
             question_index = quiz_data.get("current_question_index", 0)
-
+            print(f"Current Question Index: {question_index}")
+  
             # Check answer correctness
             correct_option_id = saved_quizzes[quiz_id]["questions"][question_index]["correct_option_id"]
             if poll_answer.option_ids[0] == correct_option_id:
                 quiz_data["score"] += 1
+                print(f"Correct Answer! Score Updated: {quiz_data['score']}")
+
 
             # Move to next question
             quiz_data["current_question_index"] += 1
             next_question_index = quiz_data["current_question_index"]
+            print(f"Next Question Index: {next_question_index}")
 
             # Check if it's the last question
             if next_question_index >= len(saved_quizzes[quiz_id]["questions"]):
+                print("Finalizing Quiz")
                 finalize_quiz(bot, quiz_data["chat_id"])
             else:
+                print("Sending Next Question")
                 send_question(bot, quiz_data["chat_id"], quiz_id, next_question_index)
