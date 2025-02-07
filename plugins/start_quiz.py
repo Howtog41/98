@@ -134,7 +134,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
 
     def finalize_quiz(bot, chat_id):
         """Finalize the quiz and show the user's score."""
-        try
+        try:
             with lock:
                 if chat_id not in active_quizzes:
                     bot.send_message(chat_id, "No active quiz found.")
