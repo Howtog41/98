@@ -138,7 +138,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
         except Exception as e:
             print(f"Error in finalize_quiz: {e}")
     @bot.poll_answer_handler()
-    def handle_poll_answer(poll_answer, chat_id):
+    def handle_poll_answer(poll_answer):
         """Handle user answers and send the next question."""
         user_id = poll_answer.user.id
         print(f"Poll Answer Received: User ID {user_id}")
