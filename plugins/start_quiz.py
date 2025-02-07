@@ -151,7 +151,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             # Display leaderboard or final message (you can add more functionality here)
             bot.send_message(chat_id, "📊 Thank you for participating in the quiz!")
             print(f"Quiz finalized for User ID: {chat_id}")
-         except Exception as e:
+        except Exception as e:
             print(f"Error in finalize_quiz: {e}")
     @bot.poll_answer_handler()
     def handle_poll_answer(poll_answer):
