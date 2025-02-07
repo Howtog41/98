@@ -177,7 +177,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             # Check if it's the last question
             if next_question_index >= len(saved_quizzes[quiz_id]["questions"]):
                 print("Finalizing Quiz")
-                finalize_quiz(bot, quiz_data["quiz_id"])
+                finalize_quiz(bot, quiz_data)
             else:
                 print("Sending Next Question")
                 send_question(bot, quiz_data["chat_id"], quiz_id, next_question_index)
