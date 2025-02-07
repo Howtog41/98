@@ -108,10 +108,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
 
     def send_question(bot, chat_id, quiz_id, question_index):
         """Send a question to the user."""
-        with lock:
-            if chat_id not in active_quizzes:
-                bot.send_message(chat_id, "Quiz session not initialized. Please restart the quiz.")
-                return
+        
             
         quiz = saved_quizzes.get(quiz_id)
         if not quiz:
@@ -133,25 +130,29 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             is_anonymous=False,
             explanation=question["explanation"]
         )
+        print(f"Sent Question {question_index + 1} to User ID: {chat_id}")
 
     def finalize_quiz(bot, chat_id):
         """Finalize the quiz and show the user's score."""
-        with lock:
-            if chat_id not in active_quizzes:
-                bot.send_message(chat_id, "No active quiz found.")
-                return
+        try
+            with lock:
+                if chat_id not in active_quizzes:
+                    bot.send_message(chat_id, "No active quiz found.")
+                    return
 
-            quiz_data = active_quizzes.pop(chat_id)
+                quiz_data = active_quizzes.pop(chat_id)
 
-        score = quiz_data["score"]
-        quiz_id = quiz_data["quiz_id"]
-        total_questions = len(saved_quizzes[quiz_id]["questions"])
+            score = quiz_data["score"]
+            quiz_id = quiz_data["quiz_id"]
+            total_questions = len(saved_quizzes[quiz_id]["questions"])
 
-        bot.send_message(chat_id, f"🎉 Quiz completed! Your score: {score}/{total_questions}")
+            bot.send_message(chat_id, f"🎉 Quiz completed! Your score: {score}/{total_questions}")
 
-        # Display leaderboard or final message (you can add more functionality here)
-        bot.send_message(chat_id, "📊 Thank you for participating in the quiz!")
-
+            # Display leaderboard or final message (you can add more functionality here)
+            bot.send_message(chat_id, "📊 Thank you for participating in the quiz!")
+            print(f"Quiz finalized for User ID: {chat_id}")
+         except Exception as e:
+            print(f"Error in finalize_quiz: {e}")
     @bot.poll_answer_handler()
     def handle_poll_answer(poll_answer):
         """Handle user answers and send the next question."""
