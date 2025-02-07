@@ -1,94 +1,183 @@
+import threading
+import time
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-def register_start_quiz_handlers(bot, saved_quizzes, user_scores):
-    @bot.message_handler(commands=['start'])
-    def start_command(message):
-        """Handle /start command to join quiz or start interaction."""
+active_quizzes = {}
+lock = threading.Lock()  # Thread-safe lock for active_quizzes
+saved_quizzes = {}
+print(saved_quizzes)
+
+
+def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
+    @bot.message_handler(commands=["start"])
+    def start_handler(message):
+        """Handle the /start command with quiz ID."""
         chat_id = message.chat.id
-        text = message.text
 
-        if text.startswith("/start quiz_"):
-            # Extract quiz_id from command
-            quiz_id = text.split("_")[1]
-            quiz = saved_quizzes.get(quiz_id)
-
-            if not quiz:
-                bot.send_message(chat_id, "❌ Quiz not found. Please check the link.")
-                return
-
-            # Start the quiz
-            bot.send_message(chat_id, f"📋 Starting Quiz: {quiz['title']}\n⏳ Duration: {quiz['timer']} seconds.")
-            send_question(chat_id, quiz, 0, user_scores)
-
+        if len(message.text.split()) > 1:
+            param = message.text.split()[1]
+            if param.startswith("quiz_"):
+                quiz_id = param.split("_", 1)[1]
+                ask_user_ready(bot, chat_id, quiz_id)
+            else:
+                bot.send_message(chat_id, "Invalid parameter. Please check the link.")
         else:
-            bot.send_message(chat_id, "Welcome! Use the link provided to start a quiz.")
+            bot.send_message(chat_id, "Welcome! Use the commands to interact with me.")
 
-    def send_question(chat_id, quiz, question_index, user_scores):
-        """Send a question to the user."""
-        if question_index < len(quiz['questions']):
-            question = quiz['questions'][question_index]
-            markup = InlineKeyboardMarkup()
-            
-            for i, option in enumerate(question['options']):
-                markup.add(InlineKeyboardButton(option, callback_data=f"answer_{quiz['id']}_{question_index}_{i}"))
-
-            bot.send_message(chat_id, f"Q{question_index + 1}: {question['question']}", reply_markup=markup)
-        else:
-            # Quiz complete, calculate score
-            calculate_score(chat_id, quiz, user_scores)
-
-    @bot.callback_query_handler(func=lambda call: call.data.startswith("answer_"))
-    def handle_answer(call):
-        """Handle user answers."""
-        data = call.data.split("_")
-        quiz_id, question_index, selected_option = data[1], int(data[2]), int(data[3])
-
+    def ask_user_ready(bot, chat_id, quiz_id):
+        """Send an inline button to confirm readiness."""
         quiz = saved_quizzes.get(quiz_id)
         if not quiz:
-            bot.answer_callback_query(call.id, "Quiz not found.")
+            bot.send_message(chat_id, f"No quiz found with ID: {quiz_id}")
             return
 
-        # Store user answer
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton("I'm Ready", callback_data=f"start_quiz_{quiz_id}"))
+        bot.send_message(chat_id, "Are you ready to start the quiz?", reply_markup=markup)
+
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("start_quiz_"))
+    def handle_start_quiz(call):
+        """Handle the 'I'm Ready' button click."""
+        quiz_id = call.data.split("_", 2)[2]
         chat_id = call.message.chat.id
-        user_scores.setdefault(chat_id, {}).setdefault(quiz_id, []).append(selected_option)
+        start_quiz_handler(bot, chat_id, quiz_id)
 
-        # Send next question
-        bot.answer_callback_query(call.id, "Answer recorded!")
-        send_question(chat_id, quiz, question_index + 1, user_scores)
+    def start_quiz_handler(bot, chat_id, quiz_id):
+        """Start a quiz given its ID."""
+        quiz = saved_quizzes.get(quiz_id)
+        if not quiz:
+            bot.send_message(chat_id, f"No quiz found with ID: {quiz_id}")
+            return
 
-    def calculate_score(chat_id, quiz, user_scores):
-        """Calculate and send the user's score."""
-        answers = user_scores.get(chat_id, {}).get(quiz['id'], [])
-        correct_answers = 0
+        with lock:
+            if chat_id in active_quizzes:
+                bot.send_message(chat_id, "You're already in a quiz! Finish it first before starting a new one.")
+                return
 
-        for i, user_answer in enumerate(answers):
-            if quiz['questions'][i]['correct_option_id'] == user_answer:
-                correct_answers += 1
+            # Initialize active quiz session
+            active_quizzes[chat_id] = {
+                "quiz_id": quiz_id,
+                "chat_id": chat_id,
+                "score": 0,
+                "current_question_index": 0,
+                "start_time": time.time(),
+                "end_time": time.time() + quiz["timer"]
+            }
 
-        total_questions = len(quiz['questions'])
-        bot.send_message(chat_id, f"🎉 Quiz Complete!\nYou scored {correct_answers}/{total_questions}.")
+        bot.send_message(chat_id, "The quiz is starting now! Good luck!")
+        threading.Thread(target=quiz_timer, args=(bot, chat_id, quiz_id, quiz["timer"])).start()
+        send_question(bot, chat_id, quiz_id, 0)
 
-        # Update leaderboard
-        update_leaderboard(chat_id, quiz, correct_answers)
+    def quiz_timer(bot, chat_id, quiz_id, duration):
+        """Run a timer for the quiz and auto-submit on expiry."""
+        end_time = time.time() + duration
 
-    leaderboard = {}
+        while time.time() < end_time:
+            remaining_time = int(end_time - time.time())
+            if remaining_time % 30 == 0 or remaining_time <= 10:
+                minutes, seconds = divmod(remaining_time, 60)
+                time_str = f"{minutes:02}:{seconds:02}"
+                bot.send_message(chat_id, f"⏳ Time left: {time_str}")
 
-    def update_leaderboard(chat_id, quiz, score):
-        """Update the leaderboard for the quiz."""
-        quiz_id = quiz['id']
-        leaderboard.setdefault(quiz_id, []).append((chat_id, score))
-        leaderboard[quiz_id].sort(key=lambda x: x[1], reverse=True)
+            time.sleep(1)
 
-        # Send leaderboard
-        send_leaderboard(chat_id, quiz)
+            # Check if the quiz was completed manually
+            with lock:
+                if chat_id not in active_quizzes or active_quizzes[chat_id]["quiz_id"] != quiz_id:
+                    return
 
-    def send_leaderboard(chat_id, quiz):
-        """Send the leaderboard to the user."""
-        quiz_id = quiz['id']
-        top_scores = leaderboard.get(quiz_id, [])[:10]  # Top 10 scores
+        # Auto-submit the quiz when time runs out
+        bot.send_message(chat_id, "⏰ Time's up! The quiz has ended.")
+        finalize_quiz(bot, chat_id)
 
-        message = f"🏆 Leaderboard for {quiz['title']}:\n"
-        for rank, (user_id, score) in enumerate(top_scores, start=1):
-            message += f"{rank}. User {user_id}: {score}/{len(quiz['questions'])}\n"
+    def send_question(bot, chat_id, quiz_id, question_index):
+        """Send a question to the user."""
+        
+            
+        quiz = saved_quizzes.get(quiz_id)
+        if not quiz:
+            bot.send_message(chat_id, "Quiz not found.")
+            return
 
-        bot.send_message(chat_id, message)
+        questions = quiz["questions"]
+        if question_index >= len(questions):
+            finalize_quiz(bot, chat_id)
+            return
+
+        question = questions[question_index]
+
+        pre_poll_message = question.get("pre_poll_message")
+        if pre_poll_message:
+            if pre_poll_message["type"] == "text":
+                bot.send_message(chat_id, pre_poll_message["content"])
+            elif pre_poll_message["type"] == "photo":
+                bot.send_photo(chat_id, pre_poll_message["content"])
+            elif pre_poll_message["type"] == "video":
+                bot.send_video(chat_id, pre_poll_message["content"])
+            # Add more types (e.g., audio, document) if needed
+        bot.send_poll(
+            chat_id,
+            question["question"],
+            question["options"],
+            type="quiz",
+            correct_option_id=question["correct_option_id"],
+            is_anonymous=False,
+            explanation=question["explanation"]
+        )
+        print(f"Sent Question {question_index + 1} to User ID: {chat_id}")
+
+    def finalize_quiz(bot, chat_id):
+        """Finalize the quiz and show the user's score."""
+        try:
+            with lock:
+                if chat_id not in active_quizzes:
+                    bot.send_message(chat_id, "No active quiz found.")
+                    return
+
+                quiz_data = active_quizzes.pop(chat_id)
+
+            score = quiz_data["score"]
+            quiz_id = quiz_data["quiz_id"]
+            total_questions = len(saved_quizzes[quiz_id]["questions"])
+
+            bot.send_message(chat_id, f"🎉 Quiz completed! Your score: {score}/{total_questions}")
+
+            # Display leaderboard or final message (you can add more functionality here)
+            bot.send_message(chat_id, "📊 Thank you for participating in the quiz!")
+            print(f"Quiz finalized for User ID: {chat_id}")
+        except Exception as e:
+            print(f"Error in finalize_quiz: {e}")
+    @bot.poll_answer_handler()
+    def handle_poll_answer(poll_answer):
+        """Handle user answers and send the next question."""
+        user_id = poll_answer.user.id
+        print(f"Poll Answer Received: User ID {user_id}")
+        with lock:
+            if user_id not in active_quizzes:
+                print("User not in active_quizzes")
+                return
+
+            quiz_data = active_quizzes[user_id]
+            quiz_id = quiz_data["quiz_id"]
+            question_index = quiz_data.get("current_question_index", 0)
+            print(f"Current Question Index: {question_index}")
+  
+            # Check answer correctness
+            correct_option_id = saved_quizzes[quiz_id]["questions"][question_index]["correct_option_id"]
+            if poll_answer.option_ids[0] == correct_option_id:
+                quiz_data["score"] += 1
+                print(f"Correct Answer! Score Updated: {quiz_data['score']}")
+
+
+            # Move to next question
+            quiz_data["current_question_index"] += 1
+            next_question_index = quiz_data["current_question_index"]
+            print(f"Next Question Index: {next_question_index}")
+
+            # Check if it's the last question
+            if next_question_index >= len(saved_quizzes[quiz_id]["questions"]):
+                print("Finalizing Quiz")
+                finalize_quiz(bot, quiz_data["chat_id"])
+            else:
+                print("Sending Next Question")
+                send_question(bot, quiz_data["chat_id"], quiz_id, next_question_index)
