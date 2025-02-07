@@ -5,7 +5,8 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 active_quizzes = {}
 lock = threading.Lock()  # Thread-safe lock for active_quizzes
 saved_quizzes = {}
-    
+print(saved_quizzes)
+
 
 def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
     @bot.message_handler(commands=["start"])
