@@ -8,7 +8,7 @@ saved_quizzes = {}
 print(saved_quizzes)
 
 
-def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
+def register_handlers(bot, save_quiz_to_db, fetch_quiz_from_db):
     @bot.message_handler(commands=["start"])
     def start_handler(message):
         """Handle the /start command with quiz ID."""
