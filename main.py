@@ -90,6 +90,3 @@ if __name__ == "__main__":
     load_plugins()
     print("Bot is running...")
     bot.infinity_polling()
-
-
-yh meri main file hAI isme mongodb add hai iske hiasab se mere plugins me mongo db add krna hai phle ise thik se dekh lo 
