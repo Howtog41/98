@@ -29,9 +29,15 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             bot.send_message(chat_id, f"No quiz found with ID: {quiz_id}")
             return
 
+        
+        title = quiz["title"]
+        timer = quiz["timer"]
+        minutes, seconds = divmod(timer, 60)
+        time_str = f"{minutes} min {seconds} sec"
+        
         markup = InlineKeyboardMarkup()
         markup.add(InlineKeyboardButton("I'm Ready", callback_data=f"start_quiz_{quiz_id}"))
-        bot.send_message(chat_id, "Are you ready to start the quiz?", reply_markup=markup)
+        bot.send_message(chat_id, f"Quiz Title: {title}\nDuration: {time_str}\n\nAre you ready?", reply_markup=markup)
 
     @bot.callback_query_handler(func=lambda call: call.data.startswith("start_quiz_"))
     def handle_start_quiz(call):
@@ -72,7 +78,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
 
         while time.time() < end_time:
             remaining_time = int(end_time - time.time())
-            if remaining_time % 30 == 0 or remaining_time <= 10:
+            if remaining_time % 60 == 0 or remaining_time <= 10:
                 hours, minutes = divmod(remaining_time, 3600)
                 minutes, seconds = divmod(minutes, 60)
                 time_str = f"{hours:02}:{minutes:02}"
@@ -102,6 +108,15 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             return
 
         question = questions[question_index]
+        pre_poll_message = question.get("pre_poll_message")
+        if pre_poll_message:
+            if pre_poll_message["type"] == "text":
+                bot.send_message(chat_id, pre_poll_message["content"])
+            elif pre_poll_message["type"] == "photo":
+                bot.send_photo(chat_id, pre_poll_message["content"])
+            elif pre_poll_message["type"] == "video":
+                bot.send_video(chat_id, pre_poll_message["content"])
+        
         bot.send_poll(
             chat_id,
             question["question"],
@@ -147,3 +162,8 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             # Move to next question
             quiz_data["current_question_index"] += 1
             send_question(bot, quiz_data["chat_id"], quiz_id, quiz_data["current_question_index"])
+    # Send the next question or finalize the quiz if completed
+        if next_question_index < len(saved_quizzes[quiz_id]["questions"]):
+            send_question(bot, quiz_data["chat_id"], quiz_id, next_question_index)
+        else:
+            finalize_quiz(bot, quiz_data["chat_id"])
