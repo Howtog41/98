@@ -123,14 +123,13 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
     
         
         bot.send_poll(
-            chat_id,
-            numbered_question,
-            question["question"],
-            question["options"],
+            chat_id=chat_id,
+            question=numbered_question,
+            options=question["options"],
             type="quiz",
             correct_option_id=question["correct_option_id"],
-            is_anonymous=False,
-            explanation=question["explanation"]
+            explanation=question["explanation"],
+            is_anonymous=False  # Ensure this is not passed twice
         )
 
     def finalize_quiz(bot, chat_id):
