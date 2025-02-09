@@ -158,6 +158,11 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
         
         bot.send_message(chat_id, f"🎉 Quiz completed! Your score: {score}/{total_questions}")
 
+
+    def is_admin(chat_id):
+        admin_ids = [1922012735]  # Replace with actual admin IDs
+        return chat_id in admin_ids
+
     @bot.message_handler(commands=["leaderboard"])
     def leaderboard_handler(message):
         """Allow admin to view the leaderboard."""
