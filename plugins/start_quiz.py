@@ -82,7 +82,14 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             if remaining_time % 60 == 0 or remaining_time <= 10:
                 hours, minutes = divmod(remaining_time, 3600)
                 minutes, seconds = divmod(minutes, 60)
-                time_str = f"{hours:02}:{minutes:02}"
+                time_parts = []
+                if hours > 0:
+                    time_parts.append(f"{hours} hour{'s' if hours > 1 else ''}")
+                if minutes > 0:
+                    time_parts.append(f"{minutes} minute{'s' if minutes > 1 else ''}")
+                if seconds > 0:
+                    time_parts.append(f"{seconds} second{'s' if seconds > 1 else ''}")
+                time_str = ", ".join(time_parts)
                 bot.send_message(chat_id, f"⏳ Time left: {time_str}")
 
             time.sleep(1)
