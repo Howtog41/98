@@ -116,9 +116,14 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
                 bot.send_photo(chat_id, pre_poll_message["content"])
             elif pre_poll_message["type"] == "video":
                 bot.send_video(chat_id, pre_poll_message["content"])
+
+        # Add numbering to the question
+        numbered_question = f"Q{question_index + 1}/{total_questions}: {question['question']}"
+    
         
         bot.send_poll(
             chat_id,
+            numbered_question,
             question["question"],
             question["options"],
             type="quiz",
