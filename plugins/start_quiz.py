@@ -158,7 +158,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
         # Calculate rank
         sorted_leaderboard = sorted(leaderboards[quiz_id], key=lambda x: x["score"], reverse=True)
         rank = next((i + 1 for i, entry in enumerate(sorted_leaderboard) if entry["chat_id"] == chat_id), len(sorted_leaderboard))
-
+        total_participants = len(sorted_leaderboard) 
         
         bot.send_message(
             chat_id,
