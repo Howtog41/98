@@ -5,6 +5,7 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 active_quizzes = {}
 lock = threading.Lock()  # Thread-safe lock for active_quizzes
 saved_quizzes = {}
+leaderboards = {}  # Store leaderboards for each quiz
 
 def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
     @bot.message_handler(commands=["start"])
@@ -145,7 +146,45 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
         quiz_id = quiz_data["quiz_id"]
         total_questions = len(saved_quizzes[quiz_id]["questions"])
 
+         # Add user to leaderboard
+        if quiz_id not in leaderboards:
+            leaderboards[quiz_id] = []
+        leaderboards[quiz_id].append({"chat_id": chat_id, "score": score})
+
+        # Calculate rank
+        sorted_leaderboard = sorted(leaderboards[quiz_id], key=lambda x: x["score"], reverse=True)
+        rank = next((i + 1 for i, entry in enumerate(sorted_leaderboard) if entry["chat_id"] == chat_id), len(sorted_leaderboard))
+
+        
         bot.send_message(chat_id, f"🎉 Quiz completed! Your score: {score}/{total_questions}")
+
+    @bot.message_handler(commands=["leaderboard"])
+    def leaderboard_handler(message):
+        """Allow admin to view the leaderboard."""
+        if not is_admin(message.chat.id):  # Replace with your admin check logic
+            bot.send_message(message.chat.id, "You are not authorized to view the leaderboard.")
+            return
+
+        args = message.text.split()
+        if len(args) < 2:
+            bot.send_message(message.chat.id, "Please provide the quiz ID. Example: /leaderboard quiz_123")
+            return
+
+        quiz_id = args[1]
+        if quiz_id not in leaderboards:
+            bot.send_message(message.chat.id, f"No leaderboard found for Quiz ID: {quiz_id}")
+            return
+
+        sorted_leaderboard = sorted(leaderboards[quiz_id], key=lambda x: x["score"], reverse=True)
+        leaderboard_text = "📊 Leaderboard:\n\n"
+        for rank, entry in enumerate(sorted_leaderboard, start=1):
+            user_info = bot.get_chat(entry["chat_id"])  # Get user info (optional)
+            username = user_info.username if user_info.username else f"User {entry['chat_id']}"
+            leaderboard_text += f"{rank}. {username} - {entry['score']} points\n"
+
+        bot.send_message(message.chat.id, leaderboard_text)
+
+
 
     @bot.poll_answer_handler()
     def handle_poll_answer(poll_answer):
