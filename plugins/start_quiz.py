@@ -38,7 +38,12 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
         
         markup = InlineKeyboardMarkup()
         markup.add(InlineKeyboardButton("I'm Ready", callback_data=f"start_quiz_{quiz_id}"))
-        bot.send_message(chat_id, f"Quiz Title: {title}\nDuration: {time_str}\n\nAre you ready?", reply_markup=markup)
+        bot.send_message(
+            chat_id,
+            f"📝 **Quiz Title:** {title}\n⏳ **Duration:** {time_str}\n\n🎉 **Are you ready to begin?**\n\n📢 *Aapko har minute par bataya jayega ki kitna time bacha hai!*",
+            reply_markup=markup,
+            parse_mode="Markdown"
+        )
 
     @bot.callback_query_handler(func=lambda call: call.data.startswith("start_quiz_"))
     def handle_start_quiz(call):
