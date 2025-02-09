@@ -103,7 +103,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             return
 
         questions = quiz["questions"]
-         total_questions = len(questions) 
+        total_questions = len(questions) 
         if question_index >= len(questions):
             finalize_quiz(bot, chat_id)
             return
