@@ -150,9 +150,9 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
         if quiz_id not in leaderboards:
             leaderboards[quiz_id] = []
 
-         user_exists = any(entry["chat_id"] == chat_id for entry in leaderboards[quiz_id])
-         if not user_exists:
-             leaderboards[quiz_id].append({"chat_id": chat_id, "score": score})
+        user_exists = any(entry["chat_id"] == chat_id for entry in leaderboards[quiz_id])
+        if not user_exists:
+            leaderboards[quiz_id].append({"chat_id": chat_id, "score": score})
 
        
         # Calculate rank
