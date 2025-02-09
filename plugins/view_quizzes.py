@@ -1,13 +1,14 @@
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-from pymongo import MongoClient
-def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
+
+def register_handlers(bot, save_quiz_to_db, fetch_quiz_from_db):
     QUIZZES_PER_PAGE = 10
 
     @bot.message_handler(commands=['view_quizzes'])
     def view_quizzes(message, page=1):
         """Display paginated list of quiz titles and unique IDs."""
         chat_id = message.chat.id
-        quiz_list = list(saved_quizzes.items())
+        quizzes_cursor = fetch_quiz_from_db(None)  # Fetch all quizzes
+        quiz_list = list(quizzes_cursor)
         total_quizzes = len(quiz_list)
         total_pages = (total_quizzes + QUIZZES_PER_PAGE - 1) // QUIZZES_PER_PAGE
 
@@ -20,8 +21,8 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
         quizzes_to_display = quiz_list[start_index:end_index]
 
         markup = InlineKeyboardMarkup()
-        for quiz_id, quiz in quizzes_to_display:
-            markup.add(InlineKeyboardButton(f"{quiz['title']} ({quiz_id})", callback_data=f"view_quiz_{quiz_id}"))
+        for quiz in quizzes_to_display:
+            markup.add(InlineKeyboardButton(f"{quiz['title']} ({quiz['quiz_id']})", callback_data=f"view_quiz_{quiz['quiz_id']}"))
 
         # Add pagination buttons
         if page > 1:
@@ -48,7 +49,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
     def view_quiz_options(call):
         """Display options for a specific quiz."""
         quiz_id = call.data.split("_")[2]
-        quiz = saved_quizzes.get(quiz_id)
+        quiz = fetch_quiz_from_db(quiz_id)  # Fetch quiz by quiz_id
         if not quiz:
             bot.answer_callback_query(call.id, "Quiz not found.")
             return
@@ -78,7 +79,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
     def edit_quiz(call):
         """Edit options for the selected quiz."""
         quiz_id = call.data.split("_")[2]
-        quiz = saved_quizzes.get(quiz_id)
+        quiz = fetch_quiz_from_db(quiz_id)  # Fetch quiz by quiz_id
         if not quiz:
             bot.answer_callback_query(call.id, "Quiz not found.")
             return
@@ -106,7 +107,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
     def share_quiz(call):
         """Generate a shareable link for the quiz."""
         quiz_id = call.data.split("_")[2]
-        quiz = saved_quizzes.get(quiz_id)
+        quiz = fetch_quiz_from_db(quiz_id)  # Fetch quiz by quiz_id
         if not quiz:
             bot.answer_callback_query(call.id, "Quiz not found.")
             return
