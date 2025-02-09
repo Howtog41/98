@@ -13,29 +13,69 @@ client = MongoClient(MONGO_URI)
 db = client['mydatabase']  # Replace 'mydatabase' with your database name
 quizzes_collection = db['quizzes']  # Collection for storing quizzes
 
-# Load quizzes from MongoDB on startup
-saved_quizzes = {}  # To store all quizzes in memory
-creating_quizzes = {}  # Temporary in-memory storage for ongoing quizzes
 
-def fetch_quizzes():
-    """
-    Load all quizzes from MongoDB into the saved_quizzes dictionary.
-    """
-    for quiz in quizzes_collection.find():
-        saved_quizzes[quiz['quiz_id']] = quiz
-    print(f"Loaded {len(saved_quizzes)} quizzes from MongoDB.")
-
-def save_quiz_to_db(quiz_id, quiz_data):
+def save_quiz_to_db(quiz_data):
     """
     Save or update a quiz in MongoDB.
     """
-    quizzes_collection.update_one(
-        {"quiz_id": quiz_id},  # Filter
-        {"$set": quiz_data},  # Update data
-        upsert=True  # Insert if not exists
-    )
+    try:
+        quizzes_collection.update_one(
+            {"quiz_id": quiz_data['quiz_id']},  # Filter based on quiz_id
+            {"$set": quiz_data},  # Update or insert quiz data
+            upsert=True  # Insert if not found
+        )
+        print(f"Quiz saved to DB: {quiz_data['quiz_id']}")
+    except Exception as e:
+        print(f"Error saving quiz: {e}")
 
-# Dynamically load plugins
+
+def fetch_quiz_from_db(quiz_id):
+    """
+    Fetch a single quiz from MongoDB using quiz_id.
+    """
+    try:
+        quiz = quizzes_collection.find_one({"quiz_id": quiz_id})
+        if quiz:
+            print(f"Quiz fetched: {quiz_id}")
+            return quiz
+        else:
+            print(f"No quiz found with ID: {quiz_id}")
+            return None
+    except Exception as e:
+        print(f"Error fetching quiz: {e}")
+        return None
+
+
+@bot.message_handler(commands=['new_quiz'])
+def new_quiz(message):
+    """
+    Example of creating a new quiz and saving it to MongoDB.
+    """
+    quiz_data = {
+        "quiz_id": "quiz123",  # Replace with dynamic ID generation
+        "title": "Sample Quiz",
+        "questions": [
+            {"question": "What is 2+2?", "options": ["3", "4", "5"], "answer": "4"}
+        ]
+    }
+    save_quiz_to_db(quiz_data)
+    bot.reply_to(message, "Quiz saved to the database!")
+
+
+@bot.message_handler(commands=['get_quiz'])
+def get_quiz(message):
+    """
+    Example of fetching a quiz from MongoDB.
+    """
+    quiz_id = "quiz123"  # Replace with dynamic user input
+    quiz = fetch_quiz_from_db(quiz_id)
+    if quiz:
+        bot.reply_to(message, f"Quiz Title: {quiz['title']}\nQuestions: {len(quiz['questions'])}")
+    else:
+        bot.reply_to(message, "Quiz not found!")
+
+
+# Dynamically load plugins (if required)
 def load_plugins():
     plugin_folder = 'plugins'
     for file in os.listdir(plugin_folder):
@@ -43,12 +83,13 @@ def load_plugins():
             module_name = f"{plugin_folder}.{file[:-3]}"
             module = importlib.import_module(module_name)
             if hasattr(module, 'register_handlers'):
-                module.register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db)
+                module.register_handlers(bot, save_quiz_to_db, fetch_quiz_from_db)
+
 
 if __name__ == "__main__":
     load_plugins()
-    # Load quizzes from MongoDB
-    fetch_quizzes()
-
     print("Bot is running...")
     bot.infinity_polling()
+
+
+yh meri main file hAI isme mongodb add hai iske hiasab se mere plugins me mongo db add krna hai phle ise thik se dekh lo 
