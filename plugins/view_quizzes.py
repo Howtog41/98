@@ -27,7 +27,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
                 f"/view_{quiz_id}\n\n"
             )
 
-        text = sanitize_text(text)
+        
         markup = InlineKeyboardMarkup()
         if page > 1:
             markup.add(InlineKeyboardButton("⬅️ Previous", callback_data=f"view_page_{page - 1}"))
