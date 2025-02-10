@@ -126,6 +126,11 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
 
             quiz_data = creating_quizzes.pop(chat_id)
             quiz_data["quiz_id"] = quiz_id  
+            quiz_data["participants"] = 0  # Initialize participants count
+            quiz_data["leaderboard"] = {}  # Initialize leaderboard
+            quiz_data["active"] = False  # Mark quiz as inactive
+
+            
             save_quiz_to_db(quiz_id, quiz_data)
             saved_quizzes[quiz_id] = quiz_data
             bot.send_message(chat_id, f"Quiz created successfully! 🎉\nQuiz ID: {quiz_id}\nUse /view_quizzes to see all quizzes.")
