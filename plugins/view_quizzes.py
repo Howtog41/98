@@ -23,16 +23,16 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
         for idx, (quiz_id, quiz) in enumerate(quizzes_to_display, start=start_index + 1):
             text += (
                 f"{idx}. {quiz['title']}\n"
-                f"\ud83d\udd8b\ufe0f {len(quiz['questions'])} questions \u2022 \u23f1 {quiz['timer'] // 60} min \u2022 \ud83d\udc65 {quiz.get('participants', 0)} people answered\n"
+                f"📝 {len(quiz['questions'])} questions • ⏱️ {quiz['timer'] // 60} min • 👥 {quiz.get('participants', 0)} people answered\n"
                 f"/view_{quiz_id}\n\n"
             )
 
-        
+        text = sanitize_text(text)
         markup = InlineKeyboardMarkup()
         if page > 1:
-            markup.add(InlineKeyboardButton("\u2b05\ufe0f Previous", callback_data=f"view_page_{page - 1}"))
+            markup.add(InlineKeyboardButton("⬅️ Previous", callback_data=f"view_page_{page - 1}"))
         if page < total_pages:
-            markup.add(InlineKeyboardButton("\u27a1\ufe0f Next", callback_data=f"view_page_{page + 1}"))
+            markup.add(InlineKeyboardButton("➡️ Next", callback_data=f"view_page_{page + 1}"))
 
         bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
 
