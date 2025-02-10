@@ -123,7 +123,11 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
                 raise ValueError
             creating_quizzes[chat_id]["timer"] = timer
             quiz_id = generate_quiz_id()
-            saved_quizzes[quiz_id] = creating_quizzes.pop(chat_id)
+
+            quiz_data = creating_quizzes.pop(chat_id)
+            quiz_data["quiz_id"] = quiz_id  
+            save_quiz_to_db(quiz_id, quiz_data)
+            saved_quizzes[quiz_id] = quiz_data
             bot.send_message(chat_id, f"Quiz created successfully! 🎉\nQuiz ID: {quiz_id}\nUse /view_quizzes to see all quizzes.")
         except ValueError:
             bot.send_message(chat_id, "Invalid duration. Please send the duration in seconds (e.g., 120 for 2 minutes).")
