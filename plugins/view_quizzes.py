@@ -23,7 +23,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
         for idx, (quiz_id, quiz) in enumerate(quizzes_to_display, start=start_index + 1):
             text += (
                 f"{idx}. {quiz['title']}\n"
-                f"\ud83d\udd8b\ufe0f {len(quiz['questions'])} questions \u2022 \u23f1 {quiz['timer'] // 60} min \u2022 \ud83d\udc65 {quiz['participants']} people answered\n"
+                f"\ud83d\udd8b\ufe0f {len(quiz['questions'])} questions \u2022 \u23f1 {quiz['timer'] // 60} min \u2022 \ud83d\udc65 {quiz.get('participants', 0)} people answered\n"
                 f"/view_{quiz_id}\n\n"
             )
 
