@@ -16,6 +16,9 @@ quizzes_collection = db['quizzes']  # Collection for storing quizzes
 # Load quizzes from MongoDB on startup
 saved_quizzes = {}  # To store all quizzes in memory
 creating_quizzes = {}  # Temporary in-memory storage for ongoing quizzes
+leaderboards = {} 
+
+
 
 def fetch_quizzes():
     """
