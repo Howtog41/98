@@ -19,7 +19,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
         end_index = start_index + QUIZZES_PER_PAGE
         quizzes_to_display = quiz_list[start_index:end_index]
 
-        text = f"\ud83d\uddcb **Saved Quizzes (Page {page}/{total_pages})**\n\n"
+        text = f"📋 **Saved Quizzes (Page {page}/{total_pages})**\n\n"
         for idx, (quiz_id, quiz) in enumerate(quizzes_to_display, start=start_index + 1):
             text += (
                 f"{idx}. {quiz['title']}\n"
