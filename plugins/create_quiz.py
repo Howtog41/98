@@ -109,6 +109,15 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
         # Mark the quiz creation process as inactive
         creating_quizzes[chat_id]["active"] = False
 
+        quiz_id = generate_quiz_id()
+        quiz_data = creating_quizzes.pop(chat_id)
+
+        # Add the quiz ID to the quiz data
+        quiz_data["quiz_id"] = quiz_id
+
+        # Save the quiz to MongoDB
+        save_quiz_to_db(quiz_id, quiz_data)
+
         bot.send_message(chat_id, "Quiz creation complete! 🎉\nNow, send the quiz duration in seconds (e.g., 120 for 2 minutes).")
 
     @bot.message_handler(func=lambda message: message.chat.id in creating_quizzes and not creating_quizzes[message.chat.id]["active"] and creating_quizzes[message.chat.id]["timer"] is None)
