@@ -178,9 +178,9 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
         
         bot.send_message(
             chat_id,
-            f"\ud83d\uddcb 📊 Quiz Title: {quiz_title}"
-            f"\ud83c\udf89 🎉 Quiz completed! Your score: {score}/{total_questions}\n"
-            f"\ud83c\udfc5 🏅 Your Rank: {rank}/{total_participants}\n"
+            f" 📊 Quiz Title: {quiz_title}"
+            f" 🎉 Quiz completed! Your score: {score}/{total_questions}\n"
+            f" 🏅 Your Rank: {rank}/{total_participants}\n"
         )
 
     def is_admin(chat_id):
