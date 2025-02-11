@@ -26,9 +26,10 @@ def fetch_quizzes():
     """
     for quiz in quizzes_collection.find():
         saved_quizzes[quiz['quiz_id']] = quiz
-        if 'leaderboard' in quiz:
-            leaderboards[quiz['quiz_id']] = quiz['leaderboard']
+        leaderboards[quiz['quiz_id']] = quiz.get('leaderboard', [])
+        saved_quizzes[quiz['quiz_id']]["participants"] = quiz.get('participants', 0)
     print(f"Loaded {len(saved_quizzes)} quizzes from MongoDB.")
+
 
 def save_quiz_to_db(quiz_id, quiz_data):
     """
