@@ -19,23 +19,23 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
         end_index = start_index + QUIZZES_PER_PAGE
         quizzes_to_display = quiz_list[start_index:end_index]
 
-        text = f"📋 **Saved Quizzes (Page {page}/{total_pages})**\n\n"
-        for idx, (quiz_id, quiz) in enumerate(quizzes_to_display, start=start_index + 1):
-            text += (
-                f"{idx}. {quiz['title']}\n"
-                f"📝 {len(quiz['questions'])} questions • ⏱️ {quiz['timer'] // 60} min • 👥 {quiz.get('participants', 0)} people answered\n"
-                f"/view_{quiz_id}\n\n"
-            )
-
-        
         markup = InlineKeyboardMarkup()
+        for quiz_id, quiz in quizzes_to_display:
+            markup.add(InlineKeyboardButton(f"{quiz['title']} ({quiz_id})", callback_data=f"view_quiz_{quiz_id}"))
+
+        # Add pagination buttons
         if page > 1:
             markup.add(InlineKeyboardButton("⬅️ Previous", callback_data=f"view_page_{page - 1}"))
         if page < total_pages:
             markup.add(InlineKeyboardButton("➡️ Next", callback_data=f"view_page_{page + 1}"))
 
-        bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
-
+        bot.send_message(
+            chat_id,
+            f"📋 **Saved Quizzes (Page {page}/{total_pages})**\n\n"
+            "Click on a quiz to view options.",
+            reply_markup=markup,
+            parse_mode="Markdown"
+        )
 
     @bot.callback_query_handler(func=lambda call: call.data.startswith("view_page_"))
     def paginate_quizzes(call):
@@ -44,37 +44,6 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
         bot.delete_message(call.message.chat.id, call.message.message_id)
         view_quizzes(call.message, page)
 
-
-    @bot.message_handler(func=lambda message: message.text.startswith("/view_"))
-    def view_quiz_details(message):
-        """View details of a specific quiz."""
-        quiz_id = message.text.split("_", 1)[1]
-        quiz = saved_quizzes.get(quiz_id)
-
-        if not quiz:
-            bot.send_message(message.chat.id, "Quiz not found.")
-            return
-
-        text = (
-            f"\ud83d\uddcb **Quiz Title**: {quiz['title']}\n"
-            f"\ud83d\udd11 **Quiz ID**: {quiz_id}\n"
-            f"\ud83d\udd8b\ufe0f **Questions**: {len(quiz['questions'])}\n"
-            f"\u23f1 **Duration**: {quiz['timer']} seconds\n"
-            f"\ud83d\udc65 **Participants**: {quiz['participants']}\n\n"
-            "Choose an option below:"
-        )
-
-        markup = InlineKeyboardMarkup()
-        markup.row(
-            InlineKeyboardButton("\ud83d\udd8a\ufe0f Edit Quiz", callback_data=f"edit_quiz_{quiz_id}"),
-            InlineKeyboardButton("\ud83d\udd17 Share Quiz", callback_data=f"share_quiz_{quiz_id}")
-        )
-        markup.add(InlineKeyboardButton("\ud83d\udd19 Back", callback_data="view_page_1"))
-
-        bot.send_message(message.chat.id, text, reply_markup=markup, parse_mode="Markdown")
-
-
-    
     @bot.callback_query_handler(func=lambda call: call.data.startswith("view_quiz_"))
     def view_quiz_options(call):
         """Display options for a specific quiz."""
