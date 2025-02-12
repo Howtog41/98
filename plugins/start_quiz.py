@@ -110,6 +110,9 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
 
     def send_question(bot, chat_id, quiz_id, question_index):
         """Send a question to the user."""
+        with lock:
+            if chat_id in active_quizzes:
+                active_quizzes[chat_id]["last_activity"] = time.time()
         quiz = saved_quizzes.get(quiz_id)
         if not quiz:
             bot.send_message(chat_id, "Quiz not found.")
@@ -241,3 +244,42 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             send_question(bot, quiz_data["chat_id"], quiz_id, next_question_index)
         else:
             finalize_quiz(bot, quiz_data["chat_id"])
+
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("resume_quiz_"))
+    def handle_resume_quiz(call):
+        """Resume the paused quiz."""
+        quiz_id = call.data.split("_", 2)[2]
+        chat_id = call.message.chat.id
+    
+        with lock:
+            if chat_id in active_quizzes and active_quizzes[chat_id].get("paused"):
+                active_quizzes[chat_id]["paused"] = False
+                active_quizzes[chat_id]["last_activity"] = time.time()
+                bot.send_message(chat_id, "✅ **Quiz Resumed!**", parse_mode="Markdown")
+                send_question(bot, chat_id, quiz_id, active_quizzes[chat_id]["current_question_index"])
+
+    def get_resume_button(quiz_id):
+        """Generate resume button markup."""
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton("▶ Resume Quiz", callback_data=f"resume_quiz_{quiz_id}"))
+        return markup
+
+    def check_inactivity(bot, chat_id, quiz_id):
+        """Check if the user is inactive and pause the quiz."""
+        while True:
+            time.sleep(300)  # 5 minutes wait
+            with lock:
+                if chat_id in active_quizzes:
+                    last_activity = active_quizzes[chat_id]["last_activity"]
+                    if time.time() - last_activity >= 300:  # 5 minutes of inactivity
+                        active_quizzes[chat_id]["paused"] = True
+                        bot.send_message(
+                            chat_id,
+                            "⏸️ **Quiz Paused due to inactivity.**",
+                            reply_markup=get_resume_button(quiz_id),
+                            parse_mode="Markdown"
+                        )
+                        return
+
+
+
