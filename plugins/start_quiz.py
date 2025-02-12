@@ -72,10 +72,12 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
                 "current_question_index": 0,
                 "start_time": time.time(),
                 "end_time": time.time() + quiz["timer"]
+                "last_activity": time.time(),  # Track last activity time
+                "paused": False
             }
 
         bot.send_message(chat_id, "The quiz is starting now! Good luck!")
-        threading.Thread(target=quiz_timer, args=(bot, chat_id, quiz_id, quiz["timer"])).start()
+        threading.Thread(target=check_inactivity, args=(bot, chat_id, quiz_id), daemon=True).start()
         send_question(bot, chat_id, quiz_id, 0)
 
     def quiz_timer(bot, chat_id, quiz_id, duration):
@@ -147,7 +149,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             explanation=question["explanation"],
             is_anonymous=False  # Ensure this is not passed twice
         )
-
+        threading.Thread(target=check_inactivity, args=(bot, chat_id, quiz_id), daemon=True).start()
     def finalize_quiz(bot, chat_id):
         """Finalize the quiz and show the user's score."""
         with lock:
