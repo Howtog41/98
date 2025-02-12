@@ -77,15 +77,26 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             }
 
         bot.send_message(chat_id, "The quiz is starting now! Good luck!")
-        threading.Thread(target=check_inactivity, args=(bot, chat_id, quiz_id), daemon=True).start()
+        threading.Thread(target=quiz_timer, args=(bot, chat_id, quiz_id, quiz["timer"]), daemon=True).start()
         send_question(bot, chat_id, quiz_id, 0)
 
     def quiz_timer(bot, chat_id, quiz_id, duration):
         """Run a timer for the quiz and auto-submit on expiry."""
         end_time = time.time() + duration
 
-        while time.time() < end_time:
+        while True:
+            with lock:
+                if chat_id not in active_quizzes or active_quizzes[chat_id]["quiz_id"] != quiz_id:
+                    return  
+
+                if active_quizzes[chat_id].get("paused"):
+                    active_quizzes[chat_id]["remaining_time"] = int(end_time - time.time())
+                    return  # Timer stops when quiz is paused
+            
             remaining_time = int(end_time - time.time())
+            if remaining_time <= 0:
+                break  # Time expired
+                
             if remaining_time % 20 == 0 or remaining_time <= 10:
                 hours, minutes = divmod(remaining_time, 3600)
                 minutes, seconds = divmod(minutes, 60)
@@ -257,9 +268,19 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             if chat_id in active_quizzes and active_quizzes[chat_id].get("paused"):
                 active_quizzes[chat_id]["paused"] = False
                 active_quizzes[chat_id]["last_activity"] = time.time()
+                # Resume Timer from Remaining Time
+                remaining_time = active_quizzes[chat_id].get("remaining_time", 0)
+                if remaining_time > 0:
+                    threading.Thread(target=quiz_timer, args=(bot, chat_id, quiz_id, remaining_time), daemon=True).start()
+
+
+                
                 bot.send_message(chat_id, "✅ **Quiz Resumed!**", parse_mode="Markdown")
                 send_question(bot, chat_id, quiz_id, active_quizzes[chat_id]["current_question_index"])
+                question_index = active_quizzes[chat_id]["current_question_index"]
+                send_question(bot, chat_id, quiz_id, question_index)
 
+    
     def get_resume_button(quiz_id):
         """Generate resume button markup."""
         markup = InlineKeyboardMarkup()
