@@ -332,7 +332,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
                 process_answer(bot, chat_id, quiz_id, selected_option)
 
     @bot.callback_query_handler(func=lambda call: call.data.startswith("skip_"))
-    def handle_skip_question(bot, call):
+    def handle_skip_question(call):
         """Handle the skip button press."""
         try:
             # Extract quiz_id as string and question_index as int
