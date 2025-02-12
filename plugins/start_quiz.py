@@ -151,7 +151,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
         numbered_question = f"Q{question_index + 1}/{total_questions}: {question['question']}"
     
         
-        bot.send_poll(
+        poll_message = bot.send_poll(
             chat_id=chat_id,
             question=numbered_question,
             options=question["options"],
@@ -160,6 +160,21 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             explanation=question["explanation"],
             is_anonymous=False  # Ensure this is not passed twice
         )
+
+        # Save poll message ID to edit later (for removing Skip button)
+        with lock:
+            active_quizzes[chat_id]["message_ids"][question_index] = poll_message.message_id
+
+        # Add "Skip" button only if the question is not attempted
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton("⏭ Skip", callback_data=f"skip_{quiz_id}_{question_index}"))
+        skip_message = bot.send_message(chat_id, "⏩ Want to skip this question?", reply_markup=markup)
+
+        # Save skip message ID to remove later
+        with lock:
+            active_quizzes[chat_id]["skip_message_ids"][question_index] = skip_message.message_id
+
+        
         threading.Thread(target=check_inactivity, args=(bot, chat_id, quiz_id), daemon=True).start()
     def finalize_quiz(bot, chat_id):
         """Finalize the quiz and show the user's score."""
@@ -307,3 +322,29 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
 
                 # Process user's answer and move to the next question
                 process_answer(bot, chat_id, quiz_id, selected_option)
+
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("skip_"))
+    def handle_skip_question(call):
+        """Handle skip button and move to the next question."""
+        chat_id = call.message.chat.id
+        quiz_id, question_index = map(int, call.data.split("_")[1:])
+
+        with lock:
+            if chat_id not in active_quizzes:
+                return
+
+            active_quizzes[chat_id].setdefault("skipped_questions", set()).add(question_index)
+            active_quizzes[chat_id]["current_question_index"] += 1
+
+            # Remove skip message
+            if question_index in active_quizzes[chat_id]["skip_message_ids"]:
+                try:
+                    bot.delete_message(
+                        chat_id,
+                        active_quizzes[chat_id]["skip_message_ids"][question_index]
+                    )
+                except Exception as e:
+                    print(f"Error removing skip message: {e}")
+
+            # Send next question
+            send_question(bot, chat_id, quiz_id, active_quizzes[chat_id]["current_question_index"])
