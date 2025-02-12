@@ -126,14 +126,6 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
         with lock:
             if chat_id in active_quizzes:
                 active_quizzes[chat_id]["last_activity"] = time.time()
-
-
-            # 🛠️ Ensure message storage dictionaries are initialized
-            if "message_ids" not in active_quizzes[chat_id]:
-                active_quizzes[chat_id]["message_ids"] = {}
-            if "skip_message_ids" not in active_quizzes[chat_id]:
-                active_quizzes[chat_id]["skip_message_ids"] = {}
-                
         quiz = saved_quizzes.get(quiz_id)
         if not quiz:
             bot.send_message(chat_id, "Quiz not found.")
@@ -159,7 +151,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
         numbered_question = f"Q{question_index + 1}/{total_questions}: {question['question']}"
     
         
-        poll_message = bot.send_poll(
+        bot.send_poll(
             chat_id=chat_id,
             question=numbered_question,
             options=question["options"],
@@ -168,21 +160,6 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             explanation=question["explanation"],
             is_anonymous=False  # Ensure this is not passed twice
         )
-
-        # Save poll message ID to edit later (for removing Skip button)
-        with lock:
-            active_quizzes[chat_id]["message_ids"][question_index] = poll_message.message_id
-
-        # Add "Skip" button only if the question is not attempted
-        markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton("⏭ Skip", callback_data=f"skip_{quiz_id}_{question_index}"))
-        skip_message = bot.send_message(chat_id, "⏩ Want to skip this question?", reply_markup=markup)
-
-        # Save skip message ID to remove later
-        with lock:
-            active_quizzes[chat_id]["skip_message_ids"][question_index] = skip_message.message_id
-
-        
         threading.Thread(target=check_inactivity, args=(bot, chat_id, quiz_id), daemon=True).start()
     def finalize_quiz(bot, chat_id):
         """Finalize the quiz and show the user's score."""
@@ -192,18 +169,6 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
                 return
 
             quiz_data = active_quizzes.pop(chat_id)
-            # ✅ Check if skipped questions exist
-            if "skipped_questions" in quiz_data and quiz_data["skipped_questions"]:
-                skipped_questions = quiz_data["skipped_questions"]
-                quiz_data["skipped_questions"] = []  # Reset skipped list
-
-                bot.send_message(chat_id, "📌 Now attempting skipped questions...")
-
-                # ✅ Send first skipped question
-                send_question(bot, chat_id, quiz_data["quiz_id"], skipped_questions.pop(0))
-                quiz_data["skipped_questions"] = skipped_questions
-                return  # Stop finalizing, as skipped questions are pending
-
 
         score = quiz_data["score"]
         quiz_id = quiz_data["quiz_id"]
@@ -276,23 +241,15 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             question_index = quiz_data.get("current_question_index", 0)
 
 
-            # ✅ Ensure skipped_questions list exists
-            if "skipped_questions" not in quiz_data:
-                quiz_data["skipped_questions"] = set()
-
-            # ✅ Remove question from skipped list if user answers it
-            if question_index in quiz_data["skipped_questions"]:
-                quiz_data["skipped_questions"].remove(question_index)
-
             # ✅ Jab bhi user answer tick kare, quiz active ho jaye
-            quiz_data["paused"] = False
-            quiz_data["last_activity"] = time.time()
+            active_quizzes[user_id]["paused"] = False
+            active_quizzes[user_id]["last_activity"] = time.time()
 
             # ✅ Agar quiz paused thi, to timer resume kare
-            remaining_time = quiz_data.get("remaining_time", 0)
+            remaining_time = active_quizzes[user_id].get("remaining_time", 0)
             if remaining_time > 0:
                 threading.Thread(target=quiz_timer, args=(bot, user_id, quiz_id, remaining_time), daemon=True).start()
-                quiz_data.pop("remaining_time", None)  # Timer reset kare
+                active_quizzes[user_id].pop("remaining_time", None)  # Timer reset kare
 
             
             # Check answer correctness
@@ -300,20 +257,8 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             if poll_answer.option_ids[0] == correct_option_id:
                 quiz_data["score"] += 1
 
-            # ✅ Remove skip button after answering
-            if "skip_message_ids" in quiz_data and question_index in quiz_data["skip_message_ids"]:
-                try:
-                    bot.edit_message_reply_markup(
-                        user_id,
-                        quiz_data["skip_message_ids"].pop(question_index),
-                        reply_markup=None
-                    )
-                except Exception as e:
-                    print(f"Error removing skip button: {e}")
-
-            # ✅ Move to nexton question (only if this was not a skipped question being answered)
-            if question_index not in quiz_data["skipped_questions"]:
-                quiz_data["current_question_index"] += 1
+            # Move to next question
+            quiz_data["current_question_index"] += 1
 
             
             
@@ -362,52 +307,3 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
 
                 # Process user's answer and move to the next question
                 process_answer(bot, chat_id, quiz_id, selected_option)
-
-    @bot.callback_query_handler(func=lambda call: call.data.startswith("skip_"))
-    def handle_skip_question(call):
-        """Handle the skip button press."""
-        try:
-            data_parts = call.data.split("_")
-            quiz_id = data_parts[1]  # Quiz ID remains a string
-            question_index = int(data_parts[2])  # Convert question_index to int
-
-            chat_id = call.message.chat.id
-
-            if chat_id in active_quizzes and quiz_id in saved_quizzes:
-                with lock:
-                    # ✅ Ensure 'skipped_questions' key exists
-                    active_quizzes[chat_id].setdefault("skipped_questions", set())
-                    active_quizzes[chat_id]["skipped_questions"].add(question_index)
-
-                    # ✅ Remove the skip button & delete the message
-                    bot.delete_message(chat_id, call.message.message_id)
-
-                # ✅ Send next question or start skipped ones
-                send_next_question_or_skipped(bot, chat_id, quiz_id, question_index + 1)
-
-        except (ValueError, KeyError) as e:
-            print(f"Error in handle_skip_question: {e}")
-
-
-    def send_next_question_or_skipped(bot, chat_id, quiz_id, question_index):
-        """Send the next question or start skipped questions if normal ones are done."""
-        if chat_id not in active_quizzes:
-            return
-
-        if "skipped_questions" not in active_quizzes[chat_id]:
-            active_quizzes[chat_id]["skipped_questions"] = set()
-
-        total_questions = len(saved_quizzes[quiz_id]["questions"])
-    
-        # ✅ If normal questions remain, send next one
-        if question_index < total_questions:
-            send_question(bot, chat_id, quiz_id, question_index)
-    
-        # ✅ If normal questions are over, start skipped questions
-        elif active_quizzes[chat_id]["skipped_questions"]:
-            next_skipped = active_quizzes[chat_id]["skipped_questions"].pop()
-            send_question(bot, chat_id, quiz_id, next_skipped)
-    
-        # ✅ If all skipped questions are done, finalize the quiz
-        else:
-            finalize_quiz(bot, chat_id, quiz_id)  # ✅ Finalize handler called
