@@ -270,35 +270,6 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
         else:
             finalize_quiz(bot, quiz_data["chat_id"])
 
-    @bot.callback_query_handler(func=lambda call: call.data.startswith("resume_quiz_"))
-    def handle_resume_quiz(call):
-        """Resume the paused quiz."""
-        quiz_id = call.data.split("_", 2)[2]
-        chat_id = call.message.chat.id
-    
-        with lock:
-            if chat_id in active_quizzes and active_quizzes[chat_id].get("paused"):
-                active_quizzes[chat_id]["paused"] = False
-                active_quizzes[chat_id]["last_activity"] = time.time()
-                # Resume Timer from Remaining Time
-                remaining_time = active_quizzes[chat_id].get("remaining_time", 0)
-                if remaining_time > 0:
-                    threading.Thread(target=quiz_timer, args=(bot, chat_id, quiz_id, remaining_time), daemon=True).start()
-                    active_quizzes[chat_id].pop("remaining_time", None)  # Timer reset kare
-
-
-                
-                bot.send_message(chat_id, "✅ **Quiz Resumed!**", parse_mode="Markdown")
-                send_question(bot, chat_id, quiz_id, active_quizzes[chat_id]["current_question_index"])
-                
-
-    
-    def get_resume_button(quiz_id):
-        """Generate resume button markup."""
-        markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton("▶ Resume Quiz", callback_data=f"resume_quiz_{quiz_id}"))
-        return markup
-
     def check_inactivity(bot, chat_id, quiz_id):
         """Check if the user is inactive and pause the quiz."""
         while True:
@@ -310,11 +281,29 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
                         active_quizzes[chat_id]["paused"] = True
                         bot.send_message(
                             chat_id,
-                            "⏸️ **Quiz Paused due to inactivity.**",
-                            reply_markup=get_resume_button(quiz_id),
+                            "⏸️ **Quiz Paused due to inactivity.**\n\n⚡ *Select any option to continue the test.*",
                             parse_mode="Markdown"
                         )
                         return
 
 
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("mcq_"))
+    def handle_mcq_selection(call):
+        """Handle MCQ selection and auto-resume if paused."""
+        chat_id = call.message.chat.id
+        quiz_id, selected_option = call.data.split("_", 2)[1:]
 
+        with lock:
+            if chat_id in active_quizzes:
+                if active_quizzes[chat_id].get("paused"):
+                    # Auto-resume the quiz when user selects an MCQ
+                    active_quizzes[chat_id]["paused"] = False
+                    active_quizzes[chat_id]["last_activity"] = time.time()
+                
+                    remaining_time = active_quizzes[chat_id].get("remaining_time", 0)
+                    if remaining_time > 0:
+                        threading.Thread(target=quiz_timer, args=(bot, chat_id, quiz_id, remaining_time), daemon=True).start()
+                        active_quizzes[chat_id].pop("remaining_time", None)
+
+                # Process user's answer and move to the next question
+                process_answer(bot, chat_id, quiz_id, selected_option)
