@@ -299,9 +299,9 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
                 except Exception as e:
                     print(f"Error removing skip button: {e}")
 
-            # ✅ Move to next question (only if this was not a skipped question being answered)
+            # ✅ Move to nexton question (only if this was not a skipped question being answered)
             if question_index not in quiz_data["skipped_questions"]:
-            quiz_data["current_question_index"] += 1
+                quiz_data["current_question_index"] += 1
 
             
             
