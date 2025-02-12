@@ -273,7 +273,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             with lock:
                 if chat_id in active_quizzes:
                     last_activity = active_quizzes[chat_id]["last_activity"]
-                    if time.time() - last_activity >= 300:  # 5 minutes of inactivity
+                    if time.time() - last_activity >= 30:  # 5 minutes of inactivity
                         active_quizzes[chat_id]["paused"] = True
                         bot.send_message(
                             chat_id,
