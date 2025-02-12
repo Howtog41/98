@@ -71,7 +71,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
                 "score": 0,
                 "current_question_index": 0,
                 "start_time": time.time(),
-                "end_time": time.time() + quiz["timer"]
+                "end_time": time.time() + quiz["timer"],
                 "last_activity": time.time(),  # Track last activity time
                 "paused": False
             }
