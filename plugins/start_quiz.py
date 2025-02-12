@@ -240,6 +240,18 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             quiz_id = quiz_data["quiz_id"]
             question_index = quiz_data.get("current_question_index", 0)
 
+
+            # ✅ Jab bhi user answer tick kare, quiz active ho jaye
+            active_quizzes[user_id]["paused"] = False
+            active_quizzes[user_id]["last_activity"] = time.time()
+
+            # ✅ Agar quiz paused thi, to timer resume kare
+            remaining_time = active_quizzes[user_id].get("remaining_time", 0)
+            if remaining_time > 0:
+                threading.Thread(target=quiz_timer, args=(bot, user_id, quiz_id, remaining_time), daemon=True).start()
+                active_quizzes[user_id].pop("remaining_time", None)  # Timer reset kare
+
+            
             # Check answer correctness
             correct_option_id = saved_quizzes[quiz_id]["questions"][question_index]["correct_option_id"]
             if poll_answer.option_ids[0] == correct_option_id:
@@ -272,13 +284,13 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
                 remaining_time = active_quizzes[chat_id].get("remaining_time", 0)
                 if remaining_time > 0:
                     threading.Thread(target=quiz_timer, args=(bot, chat_id, quiz_id, remaining_time), daemon=True).start()
+                    active_quizzes[chat_id].pop("remaining_time", None)  # Timer reset kare
 
 
                 
                 bot.send_message(chat_id, "✅ **Quiz Resumed!**", parse_mode="Markdown")
                 send_question(bot, chat_id, quiz_id, active_quizzes[chat_id]["current_question_index"])
-                question_index = active_quizzes[chat_id]["current_question_index"]
-                send_question(bot, chat_id, quiz_id, question_index)
+                
 
     
     def get_resume_button(quiz_id):
