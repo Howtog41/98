@@ -277,10 +277,10 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             quiz_data["last_activity"] = time.time()
 
             # ✅ Agar quiz paused thi, to timer resume kare
-            remaining_time = active_quizzes[user_id].get("remaining_time", 0)
+            remaining_time = quiz_data.get("remaining_time", 0)
             if remaining_time > 0:
                 threading.Thread(target=quiz_timer, args=(bot, user_id, quiz_id, remaining_time), daemon=True).start()
-                active_quizzes[user_id].pop("remaining_time", None)  # Timer reset kare
+                quiz_data.pop("remaining_time", None)  # Timer reset kare
 
             
             # Check answer correctness
