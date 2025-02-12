@@ -264,9 +264,17 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             question_index = quiz_data.get("current_question_index", 0)
 
 
+            # ✅ Ensure skipped_questions list exists
+            if "skipped_questions" not in quiz_data:
+                quiz_data["skipped_questions"] = set()
+
+            # ✅ Remove question from skipped list if user answers it
+            if question_index in quiz_data["skipped_questions"]:
+                quiz_data["skipped_questions"].remove(question_index)
+
             # ✅ Jab bhi user answer tick kare, quiz active ho jaye
-            active_quizzes[user_id]["paused"] = False
-            active_quizzes[user_id]["last_activity"] = time.time()
+            quiz_data["paused"] = False
+            quiz_data["last_activity"] = time.time()
 
             # ✅ Agar quiz paused thi, to timer resume kare
             remaining_time = active_quizzes[user_id].get("remaining_time", 0)
@@ -280,7 +288,19 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             if poll_answer.option_ids[0] == correct_option_id:
                 quiz_data["score"] += 1
 
-            # Move to next question
+            # ✅ Remove skip button after answering
+            if "skip_message_ids" in quiz_data and question_index in quiz_data["skip_message_ids"]:
+                try:
+                    bot.edit_message_reply_markup(
+                        user_id,
+                        quiz_data["skip_message_ids"].pop(question_index),
+                        reply_markup=None
+                    )
+                except Exception as e:
+                    print(f"Error removing skip button: {e}")
+
+            # ✅ Move to next question (only if this was not a skipped question being answered)
+            if question_index not in quiz_data["skipped_questions"]:
             quiz_data["current_question_index"] += 1
 
             
