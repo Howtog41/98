@@ -344,10 +344,15 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
  
             if chat_id in active_quizzes and quiz_id in saved_quizzes:
                 with lock:
+
+                    # ✅ Ensure 'skipped_questions' key exists
+                    if "skipped_questions" not in active_quizzes[chat_id]:
+                        active_quizzes[chat_id]["skipped_questions"] = set()
+
                     active_quizzes[chat_id]["skipped_questions"].add(question_index)
 
                 # Remove the skip button for this question
-                if question_index in active_quizzes[chat_id]["skip_message_ids"]:
+                if "skip_message_ids" in active_quizzes[chat_id] and question_index in active_quizzes[chat_id]["skip_message_ids"]:
                     bot.edit_message_reply_markup(
                         chat_id,
                         active_quizzes[chat_id]["skip_message_ids"].pop(question_index),
