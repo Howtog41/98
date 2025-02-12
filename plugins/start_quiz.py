@@ -126,6 +126,14 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
         with lock:
             if chat_id in active_quizzes:
                 active_quizzes[chat_id]["last_activity"] = time.time()
+
+
+            # 🛠️ Ensure message storage dictionaries are initialized
+            if "message_ids" not in active_quizzes[chat_id]:
+                active_quizzes[chat_id]["message_ids"] = {}
+            if "skip_message_ids" not in active_quizzes[chat_id]:
+                active_quizzes[chat_id]["skip_message_ids"] = {}
+                
         quiz = saved_quizzes.get(quiz_id)
         if not quiz:
             bot.send_message(chat_id, "Quiz not found.")
