@@ -267,7 +267,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
     def check_inactivity(bot, chat_id, quiz_id):
         """Check if the user is inactive and pause the quiz."""
         while True:
-            time.sleep(300)  # 5 minutes wait
+            time.sleep(30)  # 5 minutes wait
             with lock:
                 if chat_id in active_quizzes:
                     last_activity = active_quizzes[chat_id]["last_activity"]
