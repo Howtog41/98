@@ -332,27 +332,30 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
                 process_answer(bot, chat_id, quiz_id, selected_option)
 
     @bot.callback_query_handler(func=lambda call: call.data.startswith("skip_"))
-    def handle_skip_question(call):
-        """Handle skip button and move to the next question."""
-        chat_id = call.message.chat.id
-        quiz_id, question_index = map(int, call.data.split("_")[1:])
+    def handle_skip_question(bot, call):
+        """Handle the skip button press."""
+        try:
+            # Extract quiz_id as string and question_index as int
+            data_parts = call.data.split("_")
+            quiz_id = data_parts[1]  # Keep it as string
+            question_index = int(data_parts[2])  # Convert only question_index to int
 
-        with lock:
-            if chat_id not in active_quizzes:
-                return
+            chat_id = call.message.chat.id
+ 
+            if chat_id in active_quizzes and quiz_id in saved_quizzes:
+                with lock:
+                    active_quizzes[chat_id]["skipped_questions"].add(question_index)
 
-            active_quizzes[chat_id].setdefault("skipped_questions", set()).add(question_index)
-            active_quizzes[chat_id]["current_question_index"] += 1
-
-            # Remove skip message
-            if question_index in active_quizzes[chat_id]["skip_message_ids"]:
-                try:
-                    bot.delete_message(
+                # Remove the skip button for this question
+                if question_index in active_quizzes[chat_id]["skip_message_ids"]:
+                    bot.edit_message_reply_markup(
                         chat_id,
-                        active_quizzes[chat_id]["skip_message_ids"][question_index]
+                        active_quizzes[chat_id]["skip_message_ids"].pop(question_index),
+                        reply_markup=None
                     )
-                except Exception as e:
-                    print(f"Error removing skip message: {e}")
 
-            # Send next question
-            send_question(bot, chat_id, quiz_id, active_quizzes[chat_id]["current_question_index"])
+                # Send the next question
+                send_question(bot, chat_id, quiz_id, question_index + 1)
+
+        except ValueError as e:
+            print(f"Error in handle_skip_question: {e}")
