@@ -86,7 +86,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
 
         while time.time() < end_time:
             remaining_time = int(end_time - time.time())
-            if remaining_time % 60 == 0 or remaining_time <= 10:
+            if remaining_time % 20 == 0 or remaining_time <= 10:
                 hours, minutes = divmod(remaining_time, 3600)
                 minutes, seconds = divmod(minutes, 60)
                 time_parts = []
