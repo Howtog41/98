@@ -161,6 +161,20 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             is_anonymous=False  # Ensure this is not passed twice
         )
         threading.Thread(target=check_inactivity, args=(bot, chat_id, quiz_id), daemon=True).start()
+   def get_user_display_name(bot, chat_id):
+        """Fetch user's display name (username or first + last name)."""
+        try:
+            user_info = bot.get_chat(chat_id)
+            if user_info.username:
+                return f"@{user_info.username}"
+            elif user_info.first_name:
+                return f"{user_info.first_name} {user_info.last_name}".strip() if user_info.last_name else user_info.first_name
+            else:
+                return f"User {chat_id}"  # Fallback if no name is available
+        except Exception:
+            return f"User {chat_id}"  # Fallback in case of an error
+
+    
     def finalize_quiz(bot, chat_id):
         """Finalize the quiz and show the user's score."""
         with lock:
@@ -174,6 +188,10 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             quiz_id = quiz_data["quiz_id"]
             total_questions = len(saved_quizzes[quiz_id]["questions"])
             quiz_title = saved_quizzes[quiz_id]["title"]
+ 
+            # Send a loading message before processing
+            loading_msg = bot.send_message(chat_id, "⏳ Processing your results...")
+
             # Add user to leaderboard
             if quiz_id not in leaderboards:
                 leaderboards[quiz_id] = []
@@ -196,16 +214,12 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
         # Show top 5 users
         leaderboard_text += "🏆 Top 5 Users:\n"
         for rank, entry in enumerate(sorted_leaderboard[:5], start=1):
-            try:
-                user_info = bot.get_chat(entry["chat_id"])
-                username = user_info.username if user_info.username else f"User {entry['chat_id']}"
-            except Exception:
-                username = f"User {entry['chat_id']}"
-        
-            leaderboard_text += f"{rank}. {username} - {entry['score']} points\n"
+            user_display_name = get_user_display_name(bot, entry["chat_id"])
+            leaderboard_text += f"{rank}. {user_display_name} - {entry['score']} points\n"
 
-        # Show the user's name and rank after the top 5
-        leaderboard_text += f"\nYou are ranked #{rank} with a score of {score} points."
+        # Show the user's own position after top 5
+        user_display_name = get_user_display_name(bot, chat_id)
+        leaderboard_text += f"\nYou are ranked #{rank} - {user_display_name} with {score} points."
 
         # Send leaderboard message
         bot.send_message(chat_id, leaderboard_text)
@@ -235,16 +249,10 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
         sorted_leaderboard = sorted(leaderboards[quiz_id], key=lambda x: x["score"], reverse=True)
         leaderboard_text = f"📊 Leaderboard for '{quiz_title}':\n\n"
         for rank, entry in enumerate(sorted_leaderboard, start=1):
-            try:
-                user_info = bot.get_chat(entry["chat_id"])
-                username = user_info.username if user_info.username else f"User {entry['chat_id']}"
-            except Exception:
-                username = f"User {entry['chat_id']}"
-        
-            leaderboard_text += f"{rank}. {username} - {entry['score']} points\n"
+            user_display_name = get_user_display_name(bot, entry["chat_id"])
+            leaderboard_text += f"{rank}. {user_display_name} - {entry['score']} points\n"
 
         bot.send_message(message.chat.id, leaderboard_text)
-
 
 
     @bot.poll_answer_handler()
