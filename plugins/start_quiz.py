@@ -162,17 +162,17 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
         )
         threading.Thread(target=check_inactivity, args=(bot, chat_id, quiz_id), daemon=True).start()
         def get_user_display_name(bot, chat_id):
-        """Fetch user's display name (username or first + last name)."""
-        try:
-            user_info = bot.get_chat(chat_id)
-            if user_info.username:
-                return f"@{user_info.username}"
-            elif user_info.first_name:
-                return f"{user_info.first_name} {user_info.last_name}".strip() if user_info.last_name else user_info.first_name
-            else:
-                return f"User {chat_id}"  # Fallback if no name is available
-        except Exception:
-            return f"User {chat_id}"  # Fallback in case of an error
+            """Fetch user's display name (username or first + last name)."""
+            try:
+                user_info = bot.get_chat(chat_id)
+                if user_info.username:
+                    return f"@{user_info.username}"
+                elif user_info.first_name:
+                    return f"{user_info.first_name} {user_info.last_name}".strip() if user_info.last_name else user_info.first_name
+                else:
+                    return f"User {chat_id}"  # Fallback if no name is available
+            except Exception:
+                return f"User {chat_id}"  # Fallback in case of an error
 
     
     def finalize_quiz(bot, chat_id):
