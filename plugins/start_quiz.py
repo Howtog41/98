@@ -8,7 +8,9 @@ lock = threading.Lock()  # Thread-safe lock for active_quizzes
 saved_quizzes = {}
 leaderboards = {}  # Store leaderboards for each quiz
 
-def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
+def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, quizzes_collection):
+    global db_collection  # Define it globally within this module
+    db_collection = quizzes_collection  # Assign MongoDB collection to a local variable
     @bot.message_handler(commands=["start"])
     def start_handler(message):
         """Handle the /start command with quiz ID."""
@@ -189,7 +191,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
 
             
             # Load quiz from MongoDB
-            quiz = quizzes_collection.find_one({"quiz_id": quiz_id})
+            quiz = db_collection.find_one({"quiz_id": quiz_id})
             if not quiz:
                 bot.send_message(chat_id, "Error: Quiz not found in database.")
                 return
@@ -249,7 +251,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             return
 
         quiz_id = args[1]
-        quiz = quizzes_collection.find_one({"quiz_id": quiz_id})
+        quiz = db_collection.find_one({"quiz_id": quiz_id})
         if not quiz:
             bot.send_message(message.chat.id, f"No leaderboard found for Quiz ID: {quiz_id}")
             return
