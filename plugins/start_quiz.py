@@ -180,7 +180,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
     
     def finalize_quiz(bot, chat_id):
         """Finalize the quiz and show the user's score."""
-        with lock:
+         with lock:
             if chat_id not in active_quizzes:
                 bot.send_message(chat_id, "No active quiz found.")
                 return
@@ -189,71 +189,73 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             score = quiz_data["score"]
             quiz_id = quiz_data["quiz_id"]
 
-            
             # Load quiz from MongoDB
             quiz = db_collection.find_one({"quiz_id": quiz_id})
             if not quiz:
                 bot.send_message(chat_id, "Error: Quiz not found in database.")
                 return
 
-            # Initialize leaderboard if missing
-            if quiz_id not in leaderboards:
-                leaderboards[quiz_id] = []
-         
             # Send a loading message before processing
             loading_msg = bot.send_message(chat_id, "⏳ Processing your results...")
 
-
-           
-
-        
-            # Update leaderboard
+            # Fetch existing leaderboard or initialize if missing
             leaderboard = quiz.get("leaderboard", [])
-            user_exists = any(entry["chat_id"] == chat_id for entry in leaderboards[quiz_id])
-            if not user_exists:
-                leaderboards[quiz_id].append({"chat_id": chat_id, "score": score})
 
-       
-            # Sort leaderboard and get rank
+            # Print for debugging
+            print(f"📊 DEBUG: Loaded Leaderboard from DB -> {leaderboard}")
+
+            # Check if user already exists in leaderboard
+            user_exists = any(entry["chat_id"] == chat_id for entry in leaderboard)
+            if not user_exists:
+                leaderboard.append({"chat_id": chat_id, "score": score})
+
+            # Sort leaderboard by score
             leaderboard = sorted(leaderboard, key=lambda x: x["score"], reverse=True)
-            rank = next((i + 1 for i, entry in enumerate(leaderboard) if entry["chat_id"] == chat_id), len(leaderboard))
-            if rank is None:
-                rank = len(leaderboard)
-                
-            # Update leaderboard in MongoDB
-            db_collection.update_one(
+
+            # Save updated leaderboard to MongoDB
+            update_result = db_collection.update_one(
                 {"quiz_id": quiz_id},
                 {"$set": {"leaderboard": leaderboard, "participants": len(leaderboard)}}
             )
-        # Fetch quiz title and total questions
-        quiz_title = quiz.get("title", "Unknown Quiz")
-        total_questions = quiz.get("total_questions", len(quiz.get("questions", [])))
-        total_participants = len(leaderboard)
-         # Ensure leaderboard has data
-        if not leaderboard:
-            bot.edit_message_text("No participants found for this quiz.", chat_id, message_id=loading_msg.message_id)
-            return
 
-        # Get top 5 users
-        top_5 = leaderboard[:5]
-        
-        # Create leaderboard message
-        leaderboard_text = f"📊 Quiz Title: {quiz_title}\n"
-        leaderboard_text += f"🎉 Quiz completed! Your score: {score}/{total_questions}\n"
-        leaderboard_text += f"🏅 Your Rank: {rank}/{total_participants}\n\n"
-    
-         # Show top 5 users
-        leaderboard_text += "🏆 Top 5 Users:\n"
-        for i, entry in enumerate(sorted_leaderboard, start=1):
-            user_display_name = get_user_display_name(bot, entry["chat_id"])
-            leaderboard_text += f"{i}. {user_display_name} - {entry['score']} points\n"
+            # Print update result for debugging
+            print(f"✅ DEBUG: MongoDB Update Result -> {update_result.modified_count}")
 
-        # Show the user's own position after top 5
-        user_display_name = get_user_display_name(bot, chat_id)
-        leaderboard_text += f"\nYou are ranked #{rank} - {user_display_name} with {score} points."
+            # Get user rank
+            rank = next((i + 1 for i, entry in enumerate(leaderboard) if entry["chat_id"] == chat_id), None)
+            if rank is None:
+                rank = len(leaderboard)
 
-        # Send leaderboard message
-        bot.edit_message_text(leaderboard_text, chat_id, message_id=loading_msg.message_id)
+            # Fetch quiz details
+            quiz_title = quiz.get("title", "Unknown Quiz")
+            total_questions = quiz.get("total_questions", len(quiz.get("questions", [])))
+            total_participants = len(leaderboard)
+
+            # Ensure leaderboard has data
+            if not leaderboard:
+                bot.edit_message_text("No participants found for this quiz.", chat_id, message_id=loading_msg.message_id)
+                return
+
+            # Get top 5 users
+            top_5 = leaderboard[:5]
+
+            # Create leaderboard message
+            leaderboard_text = f"📊 Quiz Title: {quiz_title}\n"
+            leaderboard_text += f"🎉 Quiz completed! Your score: {score}/{total_questions}\n"
+            leaderboard_text += f"🏅 Your Rank: {rank}/{total_participants}\n\n"
+
+            # Show top 5 users
+            leaderboard_text += "🏆 Top 5 Users:\n"
+            for i, entry in enumerate(top_5, start=1):
+                user_display_name = get_user_display_name(bot, entry["chat_id"])
+                leaderboard_text += f"{i}. {user_display_name} - {entry['score']} points\n"
+
+            # Show the user's own position after top 5
+            user_display_name = get_user_display_name(bot, chat_id)
+            leaderboard_text += f"\nYou are ranked #{rank} - {user_display_name} with {score} points."
+
+            # Send leaderboard message
+            bot.edit_message_text(leaderboard_text, chat_id, message_id=loading_msg.message_id)
 
     def is_admin(chat_id):
         admin_ids = [1922012735]  # Replace with actual admin IDs
