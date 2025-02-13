@@ -53,6 +53,11 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
         """Handle the 'I'm Ready' button click."""
         quiz_id = call.data.split("_", 2)[2]
         chat_id = call.message.chat.id
+         message_id = call.message.message_id  # Get message ID
+
+        # Remove the inline button by editing the message
+        bot.edit_message_reply_markup(chat_id, message_id, reply_markup=None)
+
         start_quiz_handler(bot, chat_id, quiz_id)
 
     def start_quiz_handler(bot, chat_id, quiz_id):
