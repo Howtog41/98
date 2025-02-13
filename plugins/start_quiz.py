@@ -161,7 +161,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             is_anonymous=False  # Ensure this is not passed twice
         )
         threading.Thread(target=check_inactivity, args=(bot, chat_id, quiz_id), daemon=True).start()
-   def get_user_display_name(bot, chat_id):
+        def get_user_display_name(bot, chat_id):
         """Fetch user's display name (username or first + last name)."""
         try:
             user_info = bot.get_chat(chat_id)
