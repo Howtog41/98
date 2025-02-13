@@ -195,7 +195,11 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             if not quiz:
                 bot.send_message(chat_id, "Error: Quiz not found in database.")
                 return
- 
+
+            # Initialize leaderboard if missing
+            if quiz_id not in leaderboards:
+                leaderboards[quiz_id] = []
+         
             # Send a loading message before processing
             loading_msg = bot.send_message(chat_id, "⏳ Processing your results...")
 
@@ -211,21 +215,26 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             rank = next((i + 1 for i, entry in enumerate(leaderboard) if entry["chat_id"] == chat_id), len(leaderboard))
 
             # Update leaderboard in MongoDB
-            quizzes_collection.update_one(
+            db_collection.update_one(
                 {"quiz_id": quiz_id},
                 {"$set": {"leaderboard": leaderboard, "participants": len(leaderboard)}}
             )
+        # Fetch quiz title and total questions
+        quiz_title = quiz.get("title", "Unknown Quiz")
+        total_questions = quiz.get("total_questions", len(quiz.get("questions", [])))
+        total_participants = len(leaderboard)
+        sorted_leaderboard = leaderboard[:5]  # Get top 5 users
         
         # Create leaderboard message
         leaderboard_text = f"📊 Quiz Title: {quiz_title}\n"
         leaderboard_text += f"🎉 Quiz completed! Your score: {score}/{total_questions}\n"
         leaderboard_text += f"🏅 Your Rank: {rank}/{total_participants}\n\n"
     
-        # Show top 5 users
+         # Show top 5 users
         leaderboard_text += "🏆 Top 5 Users:\n"
-        for rank, entry in enumerate(sorted_leaderboard[:5], start=1):
+        for i, entry in enumerate(sorted_leaderboard, start=1):
             user_display_name = get_user_display_name(bot, entry["chat_id"])
-            leaderboard_text += f"{rank}. {user_display_name} - {entry['score']} points\n"
+            leaderboard_text += f"{i}. {user_display_name} - {entry['score']} points\n"
 
         # Show the user's own position after top 5
         user_display_name = get_user_display_name(bot, chat_id)
