@@ -170,30 +170,45 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
 
             quiz_data = active_quizzes.pop(chat_id)
 
-        score = quiz_data["score"]
-        quiz_id = quiz_data["quiz_id"]
-        total_questions = len(saved_quizzes[quiz_id]["questions"])
-        quiz_title = saved_quizzes[quiz_id]["title"]
-         # Add user to leaderboard
-        if quiz_id not in leaderboards:
-            leaderboards[quiz_id] = []
+            score = quiz_data["score"]
+            quiz_id = quiz_data["quiz_id"]
+            total_questions = len(saved_quizzes[quiz_id]["questions"])
+            quiz_title = saved_quizzes[quiz_id]["title"]
+            # Add user to leaderboard
+            if quiz_id not in leaderboards:
+                leaderboards[quiz_id] = []
 
-        user_exists = any(entry["chat_id"] == chat_id for entry in leaderboards[quiz_id])
-        if not user_exists:
-            leaderboards[quiz_id].append({"chat_id": chat_id, "score": score})
+            user_exists = any(entry["chat_id"] == chat_id for entry in leaderboards[quiz_id])
+            if not user_exists:
+                leaderboards[quiz_id].append({"chat_id": chat_id, "score": score})
 
        
-        # Calculate rank
-        sorted_leaderboard = sorted(leaderboards[quiz_id], key=lambda x: x["score"], reverse=True)
-        rank = next((i + 1 for i, entry in enumerate(sorted_leaderboard) if entry["chat_id"] == chat_id), len(sorted_leaderboard))
-        total_participants = len(sorted_leaderboard) 
+            # Calculate rank
+            sorted_leaderboard = sorted(leaderboards[quiz_id], key=lambda x: x["score"], reverse=True)
+            rank = next((i + 1 for i, entry in enumerate(sorted_leaderboard) if entry["chat_id"] == chat_id), len(sorted_leaderboard))
+            total_participants = len(sorted_leaderboard) 
         
-        bot.send_message(
-            chat_id,
-            f"📊 Quiz Title: {quiz_title}"
-            f"🎉 Quiz completed! Your score: {score}/{total_questions}\n"
-            f"🏅 Your Rank: {rank}/{total_participants}\n"
-        )
+        # Create leaderboard message
+        leaderboard_text = f"📊 Quiz Title: {quiz_title}\n"
+        leaderboard_text += f"🎉 Quiz completed! Your score: {score}/{total_questions}\n"
+        leaderboard_text += f"🏅 Your Rank: {rank}/{total_participants}\n\n"
+    
+        # Show top 5 users
+        leaderboard_text += "🏆 Top 5 Users:\n"
+        for rank, entry in enumerate(sorted_leaderboard[:5], start=1):
+            try:
+                user_info = bot.get_chat(entry["chat_id"])
+                username = user_info.username if user_info.username else f"User {entry['chat_id']}"
+            except Exception:
+                username = f"User {entry['chat_id']}"
+        
+            leaderboard_text += f"{rank}. {username} - {entry['score']} points\n"
+
+        # Show the user's name and rank after the top 5
+        leaderboard_text += f"\nYou are ranked #{rank} with a score of {score} points."
+
+        # Send leaderboard message
+        bot.send_message(chat_id, leaderboard_text)
 
     def is_admin(chat_id):
         admin_ids = [1922012735]  # Replace with actual admin IDs
@@ -220,8 +235,12 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
         sorted_leaderboard = sorted(leaderboards[quiz_id], key=lambda x: x["score"], reverse=True)
         leaderboard_text = f"📊 Leaderboard for '{quiz_title}':\n\n"
         for rank, entry in enumerate(sorted_leaderboard, start=1):
-            user_info = bot.get_chat(entry["chat_id"])  # Get user info (optional)
-            username = user_info.username if user_info.username else f"User {entry['chat_id']}"
+            try:
+                user_info = bot.get_chat(entry["chat_id"])
+                username = user_info.username if user_info.username else f"User {entry['chat_id']}"
+            except Exception:
+                username = f"User {entry['chat_id']}"
+        
             leaderboard_text += f"{rank}. {username} - {entry['score']} points\n"
 
         bot.send_message(message.chat.id, leaderboard_text)
