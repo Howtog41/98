@@ -203,6 +203,10 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             # Send a loading message before processing
             loading_msg = bot.send_message(chat_id, "⏳ Processing your results...")
 
+
+           
+
+        
             # Update leaderboard
             leaderboard = quiz.get("leaderboard", [])
             user_exists = any(entry["chat_id"] == chat_id for entry in leaderboards[quiz_id])
@@ -213,7 +217,9 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             # Sort leaderboard and get rank
             leaderboard = sorted(leaderboard, key=lambda x: x["score"], reverse=True)
             rank = next((i + 1 for i, entry in enumerate(leaderboard) if entry["chat_id"] == chat_id), len(leaderboard))
-
+            if rank is None:
+                rank = len(leaderboard)
+                
             # Update leaderboard in MongoDB
             db_collection.update_one(
                 {"quiz_id": quiz_id},
@@ -223,7 +229,13 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
         quiz_title = quiz.get("title", "Unknown Quiz")
         total_questions = quiz.get("total_questions", len(quiz.get("questions", [])))
         total_participants = len(leaderboard)
-        sorted_leaderboard = leaderboard[:5]  # Get top 5 users
+         # Ensure leaderboard has data
+        if not leaderboard:
+            bot.edit_message_text("No participants found for this quiz.", chat_id, message_id=loading_msg.message_id)
+            return
+
+        # Get top 5 users
+        top_5 = leaderboard[:5]
         
         # Create leaderboard message
         leaderboard_text = f"📊 Quiz Title: {quiz_title}\n"
