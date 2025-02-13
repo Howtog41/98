@@ -222,7 +222,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
         leaderboard_text += f"\nYou are ranked #{rank} - {user_display_name} with {score} points."
 
         # Send leaderboard message
-        bot.edit_message_text(chat_id, leaderboard_text, loading_msg.message_id )
+        bot.edit_message_text(leaderboard_text, chat_id, message_id=loading_msg.message_id)
 
     def is_admin(chat_id):
         admin_ids = [1922012735]  # Replace with actual admin IDs
