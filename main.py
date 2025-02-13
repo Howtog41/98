@@ -57,7 +57,7 @@ def load_plugins():
             module_name = f"{plugin_folder}.{file[:-3]}"
             module = importlib.import_module(module_name)
             if hasattr(module, 'register_handlers'):
-                module.register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db)
+                module.register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, quizzes_collection)
 
 if __name__ == "__main__":
     load_plugins()
