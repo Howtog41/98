@@ -2,7 +2,7 @@ import threading
 import time
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-quizzes_collection = {}
+
 active_quizzes = {}
 lock = threading.Lock()  # Thread-safe lock for active_quizzes
 saved_quizzes = {}
