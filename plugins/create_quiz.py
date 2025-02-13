@@ -6,7 +6,7 @@ def generate_quiz_id():
     return ''.join(random.choices(string.ascii_letters + string.digits, k=6))
 
 
-def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
+def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, quizzes_collection):
     @bot.message_handler(commands=['create_quiz'])
     def create_quiz(message):
         """Start creating a new quiz."""
