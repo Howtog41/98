@@ -183,28 +183,35 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
                 return
 
             quiz_data = active_quizzes.pop(chat_id)
-
             score = quiz_data["score"]
             quiz_id = quiz_data["quiz_id"]
-            total_questions = len(saved_quizzes[quiz_id]["questions"])
-            quiz_title = saved_quizzes[quiz_id]["title"]
+
+            
+            # Load quiz from MongoDB
+            quiz = quizzes_collection.find_one({"quiz_id": quiz_id})
+            if not quiz:
+                bot.send_message(chat_id, "Error: Quiz not found in database.")
+                return
  
             # Send a loading message before processing
             loading_msg = bot.send_message(chat_id, "⏳ Processing your results...")
 
-            # Add user to leaderboard
-            if quiz_id not in leaderboards:
-                leaderboards[quiz_id] = []
-
+            # Update leaderboard
+            leaderboard = quiz.get("leaderboard", [])
             user_exists = any(entry["chat_id"] == chat_id for entry in leaderboards[quiz_id])
             if not user_exists:
                 leaderboards[quiz_id].append({"chat_id": chat_id, "score": score})
 
        
-            # Calculate rank
-            sorted_leaderboard = sorted(leaderboards[quiz_id], key=lambda x: x["score"], reverse=True)
-            rank = next((i + 1 for i, entry in enumerate(sorted_leaderboard) if entry["chat_id"] == chat_id), len(sorted_leaderboard))
-            total_participants = len(sorted_leaderboard) 
+            # Sort leaderboard and get rank
+            leaderboard = sorted(leaderboard, key=lambda x: x["score"], reverse=True)
+            rank = next((i + 1 for i, entry in enumerate(leaderboard) if entry["chat_id"] == chat_id), len(leaderboard))
+
+            # Update leaderboard in MongoDB
+            quizzes_collection.update_one(
+                {"quiz_id": quiz_id},
+                {"$set": {"leaderboard": leaderboard, "participants": len(leaderboard)}}
+            )
         
         # Create leaderboard message
         leaderboard_text = f"📊 Quiz Title: {quiz_title}\n"
@@ -241,12 +248,14 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
             return
 
         quiz_id = args[1]
-        if quiz_id not in leaderboards:
+        quiz = quizzes_collection.find_one({"quiz_id": quiz_id})
+        if not quiz:
             bot.send_message(message.chat.id, f"No leaderboard found for Quiz ID: {quiz_id}")
             return
 
-        quiz_title = saved_quizzes[quiz_id]["title"]
-        sorted_leaderboard = sorted(leaderboards[quiz_id], key=lambda x: x["score"], reverse=True)
+        leaderboard = quiz.get("leaderboard", [])
+        leaderboard = sorted(leaderboard, key=lambda x: x["score"], reverse=True)
+
         leaderboard_text = f"📊 Leaderboard for '{quiz_title}':\n\n"
         for rank, entry in enumerate(sorted_leaderboard, start=1):
             user_display_name = get_user_display_name(bot, entry["chat_id"])
