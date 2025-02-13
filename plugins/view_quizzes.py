@@ -1,6 +1,6 @@
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pymongo import MongoClient
-def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db):
+def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, quizzes_collection):
     QUIZZES_PER_PAGE = 10
 
     @bot.message_handler(commands=['view_quizzes'])
