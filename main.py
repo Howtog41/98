@@ -37,7 +37,15 @@ def save_quiz_to_db(quiz_id, quiz_data):
     """
     quizzes_collection.update_one(
         {"quiz_id": quiz_id},  # Filter
-        {"$set": quiz_data},  # Update data
+        {"$set": {
+            "quiz_id": quiz_id,
+            "title": quiz_data.get("title", ""),
+            "questions": quiz_data.get("questions", []),
+            "participants": quiz_data.get("participants", 0),
+            "leaderboard": quiz_data.get("leaderboard", []),
+            "timer": quiz_data.get("timer"),
+            "active": quiz_data.get("active", False)
+        }},
         upsert=True  # Insert if not exists
     )
 
