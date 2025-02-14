@@ -69,7 +69,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
 
         with lock:
             if chat_id in active_quizzes:
-                bot.send_message(chat_id, "You're already in a quiz! Finish it first before starting a new one.")
+                bot.send_message(chat_id, ""📢 आप पहले से ही एक क्विज़ में भाग ले रहे हैं! ⏳ कृपया पहले इसे पूर्ण करें, तभी आप नई क्विज़ प्रारंभ कर सकेंगे। ✅ जब तक वर्तमान क्विज़ संपन्न नहीं होती, नई क्विज़ आरंभ नहीं होगी। 🚫"")
                 return
 
             # Initialize active quiz session
@@ -105,9 +105,10 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             if remaining_time <= 0:
                 break  # Time expired
                 
-            if remaining_time % 20 == 0 or remaining_time <= 10:
-                hours, minutes = divmod(remaining_time, 3600)
-                minutes, seconds = divmod(minutes, 60)
+            if remaining_time in [10500, 7200, 3600, 1800, 900, 600, 300, 60, 30, 20, 10, 5, 3, 1]:
+                hours, remainder = divmod(remaining_time, 3600)
+                minutes, seconds = divmod(remainder, 60)
+
                 time_parts = []
                 if hours > 0:
                     time_parts.append(f"{hours} hour{'s' if hours > 1 else ''}")
@@ -115,8 +116,10 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
                     time_parts.append(f"{minutes} minute{'s' if minutes > 1 else ''}")
                 if seconds > 0:
                     time_parts.append(f"{seconds} second{'s' if seconds > 1 else ''}")
-                time_str = ", ".join(time_parts)
+
+                time_str = " and ".join(time_parts)
                 bot.send_message(chat_id, f"⏳ Time left: {time_str}")
+
 
             time.sleep(1)
 
