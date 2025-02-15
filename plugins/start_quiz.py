@@ -315,9 +315,9 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
 
         message_parts.append(leaderboard_text)  # Add last part
 
-    # Send messages
-    for part in message_parts:
-        bot.send_message(message.chat.id, part)
+        # Send messages
+        for part in message_parts:
+            bot.send_message(message.chat.id, part)
 
 
     @bot.poll_answer_handler()
