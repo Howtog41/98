@@ -300,6 +300,8 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
         max_entries = 20
         leaderboard = leaderboard[:max_entries]
         leaderboard_text = f"📊 Leaderboard for '{quiz_title}':\n\n"
+        message_parts = []  # ✅ Initialize message_parts before use
+
         for rank, entry in enumerate(sorted_leaderboard, start=1):
             user_display_name = get_user_display_name(bot, entry["chat_id"])
             line = f"{rank}. {user_display_name} - {entry['score']} points\n"
