@@ -419,9 +419,9 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
         )
     
         threading.Thread(target=group_quiz_timer, args=(bot, chat_id, timer)).start()
-        send_next_question(bot, chat_id)
+        send_next_poll(bot, chat_id)
 
-    def send_next_question(bot, chat_id):
+    def send_next_poll(bot, chat_id):
         """Send the next question in the quiz."""
         quiz_data = active_quizzes.get(chat_id)
         if not quiz_data or quiz_data["submitted"]:
@@ -434,28 +434,32 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             return  # No more questions
     
         question = questions[index]
-        question_text = question["question"]
-        options = question["options"]
-    
-        markup = InlineKeyboardMarkup()
-        for i, option in enumerate(options):
-            markup.add(InlineKeyboardButton(option, callback_data=f"ans_{chat_id}_{index}_{i}"))
-    
-        bot.send_message(chat_id, f"❓ {question_text}", reply_markup=markup)
 
-    def handle_answer(bot, call):
-        """Handle user answer selection."""
-        data = call.data.split("_")
-        chat_id = int(data[1])
-        question_index = int(data[2])
-        user_id = call.from_user.id
+        bot.send_poll(
+            chat_id,
+            question["question"],
+            options=question["options"],
+            is_anonymous=True,
+            type="quiz",
+            correct_option_id=question["correct_index"],
+            allows_multiple_answers=False
+        )
+
+
+    
+    def handle_poll_answer(bot, poll_answer):
+         """Store user poll response."""
+        chat_id = poll_answer.poll_id  # Poll ID as identifier
+        user_id = poll_answer.user.id
+        selected_option = poll_answer.option_ids[0]  # Only one option is selected
+
     
         if chat_id not in active_quizzes:
             return
     
-        active_quizzes[chat_id]["responses"][user_id] = question_index
+        active_quizzes[chat_id]["responses"][user_id] = selected_option
         active_quizzes[chat_id]["current_index"] += 1
-        send_next_question(bot, chat_id)
+        send_next_poll(bot, chat_id)
 
     def group_quiz_timer(bot, chat_id, duration):
         """Manage quiz timer and auto-submit after time runs out."""
