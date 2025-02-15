@@ -448,7 +448,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
 
     
     def handle_poll_answer(bot, poll_answer):
-         """Store user poll response."""
+        """Store user poll response."""
         chat_id = poll_answer.poll_id  # Poll ID as identifier
         user_id = poll_answer.user.id
         selected_option = poll_answer.option_ids[0]  # Only one option is selected
