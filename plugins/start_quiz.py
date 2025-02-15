@@ -20,7 +20,12 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             param = message.text.split()[1]
             if param.startswith("quiz_"):
                 quiz_id = param.split("_", 1)[1]
-                ask_user_ready(bot, chat_id, quiz_id)
+                if chat_type in ["group", "supergroup"]:
+                    # Group mode ke liye alag function call karo
+                    handle_group_quiz(bot, chat_id, quiz_id)
+                else:
+                    # Personal mode ke liye normal function call karo
+                    ask_user_ready(bot, chat_id, quiz_id)
             else:
                 bot.send_message(chat_id, "Invalid parameter. Please check the link.")
         else:
@@ -385,67 +390,8 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
                 # Process user's answer and move to the next question
                 process_answer(bot, chat_id, quiz_id, selected_option)
 
-    def handle_poll_answer_group(poll_answer):
-        """Handle answers in a group quiz scenario."""
-        chat_id = poll_answer.chat.id
-        user_id = poll_answer.user.id
-    
-        with lock:
-            if chat_id not in active_group_quizzes:
-                return
 
-            quiz_data = active_group_quizzes[chat_id]
-            quiz_id = quiz_data["quiz_id"]
-            question_index = quiz_data.get("current_question_index", 0)
-
-            # Store user response without revealing correctness
-            user_responses.setdefault(chat_id, {}).setdefault(user_id, {})
-            user_responses[chat_id][user_id][question_index] = poll_answer.option_ids[0]
-        
-            # Move to next question once the first user answers
-            quiz_data["current_question_index"] += 1
-            next_question_index = quiz_data["current_question_index"]
-
-        # Send the next question or finalize quiz if completed
-        if next_question_index < len(saved_quizzes[quiz_id]["questions"]):
-            send_question_to_group(bot, chat_id, quiz_id, next_question_index)
-        else:
-            finalize_quiz_group(bot, chat_id)
-
-
-    def finalize_quiz_group(bot, chat_id):
-        """Finalize the quiz and display the leaderboard and answer key in group chats."""
-        with lock:
-            if chat_id not in active_group_quizzes:
-                bot.send_message(chat_id, "No active quiz found.")
-                return
-
-            quiz_data = active_group_quizzes.pop(chat_id)
-            quiz_id = quiz_data["quiz_id"]
-            questions = saved_quizzes[quiz_id]["questions"]
-            leaderboard = []
-
-            # Calculate scores
-            for user_id, responses in user_responses.get(chat_id, {}).items():
-                score = sum(1 for i, ans in responses.items() if ans == questions[i]["correct_option_id"])
-                leaderboard.append({"user_id": user_id, "score": score})
-
-            # Sort leaderboard
-            leaderboard.sort(key=lambda x: x["score"], reverse=True)
-        
-            # Generate answer key
-            answer_key = "📜 *Answer Key:*\n"
-            for i, q in enumerate(questions):
-                correct_option = q["options"][q["correct_option_id"]]
-                answer_key += f"{i+1}. {correct_option}\n"
-        
-            # Send answer key first
-            bot.send_message(chat_id, answer_key, parse_mode="Markdown")
-        
-            # Generate and send leaderboard
-            leaderboard_text = "🏆 *Leaderboard:*\n"
-            for rank, entry in enumerate(leaderboard, start=1):
-                user_name = get_user_display_name(bot, entry["user_id"])
-                leaderboard_text += f"{rank}. {user_name} - {entry['score']} points\n"
-        
-            bot.send_message(chat_id, leaderboard_text, parse_mode="Markdown")
+    def handle_group_quiz(bot, chat_id, quiz_id):
+        """Handle quiz start in group mode."""
+        bot.send_message(chat_id, f"🔹 Group Quiz `{quiz_id}` started!\nWait for the first answer to continue.")
+        # Yahan group quiz ka logic daal sakte ho
