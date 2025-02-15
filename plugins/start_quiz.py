@@ -295,7 +295,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             return
         title = quiz["title"]
         leaderboard = quiz.get("leaderboard", [])
-        leaderboard = sorted(leaderboard, key=lambda x: x["score"], reverse=True)
+        sorted_leaderboard = sorted(leaderboard, key=lambda x: x["score"], reverse=True)
         # Limit entries (set max_entries = 20)
         max_entries = 20
         leaderboard = leaderboard[:max_entries]
