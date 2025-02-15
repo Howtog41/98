@@ -15,17 +15,12 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
     def start_handler(message):
         """Handle the /start command with quiz ID."""
         chat_id = message.chat.id
-        chat_type = message.chat.type
+
         if len(message.text.split()) > 1:
             param = message.text.split()[1]
             if param.startswith("quiz_"):
                 quiz_id = param.split("_", 1)[1]
-                if chat_type in ["group", "supergroup"]:
-                    # Group mode ke liye alag function call karo
-                    handle_group_quiz(bot, chat_id, quiz_id)
-                else:
-                    # Personal mode ke liye normal function call karo
-                    ask_user_ready(bot, chat_id, quiz_id)
+                ask_user_ready(bot, chat_id, quiz_id)
             else:
                 bot.send_message(chat_id, "Invalid parameter. Please check the link.")
         else:
@@ -301,13 +296,26 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
 
         leaderboard = quiz.get("leaderboard", [])
         leaderboard = sorted(leaderboard, key=lambda x: x["score"], reverse=True)
-
+        # Limit entries (set max_entries = 20)
+        max_entries = 20
+        leaderboard = leaderboard[:max_entries]
         leaderboard_text = f"📊 Leaderboard for '{quiz_title}':\n\n"
         for rank, entry in enumerate(sorted_leaderboard, start=1):
             user_display_name = get_user_display_name(bot, entry["chat_id"])
-            leaderboard_text += f"{rank}. {user_display_name} - {entry['score']} points\n"
+            line = f"{rank}. {user_display_name} - {entry['score']} points\n"
+        
+            # Check if message length exceeds Telegram's limit
+            if len(leaderboard_text) + len(line) > 4000:
+                message_parts.append(leaderboard_text)  # Save current part
+                leaderboard_text = ""  # Start a new message
 
-        bot.send_message(message.chat.id, leaderboard_text)
+            leaderboard_text += line
+
+        message_parts.append(leaderboard_text)  # Add last part
+
+    # Send messages
+    for part in message_parts:
+        bot.send_message(message.chat.id, part)
 
 
     @bot.poll_answer_handler()
@@ -389,9 +397,3 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
 
                 # Process user's answer and move to the next question
                 process_answer(bot, chat_id, quiz_id, selected_option)
-
-
-    def handle_group_quiz(bot, chat_id, quiz_id):
-        """Handle quiz start in group mode."""
-        bot.send_message(chat_id, f"🔹 Group Quiz `{quiz_id}` started!\nWait for the first answer to continue.")
-        # Yahan group quiz ka logic daal sakte ho
