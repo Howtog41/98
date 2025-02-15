@@ -293,13 +293,13 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
         if not quiz:
             bot.send_message(message.chat.id, f"No leaderboard found for Quiz ID: {quiz_id}")
             return
-
+        title = quiz["title"]
         leaderboard = quiz.get("leaderboard", [])
         leaderboard = sorted(leaderboard, key=lambda x: x["score"], reverse=True)
         # Limit entries (set max_entries = 20)
         max_entries = 20
         leaderboard = leaderboard[:max_entries]
-        leaderboard_text = f"📊 Leaderboard for '{quiz_title}':\n\n"
+        leaderboard_text = f"📊 Leaderboard for '{title}':\n\n"
         message_parts = []  # ✅ Initialize message_parts before use
 
         for rank, entry in enumerate(sorted_leaderboard, start=1):
