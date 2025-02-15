@@ -15,7 +15,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
     def start_handler(message):
         """Handle the /start command with quiz ID."""
         chat_id = message.chat.id
-
+        chat_type = message.chat.type
         if len(message.text.split()) > 1:
             param = message.text.split()[1]
             if param.startswith("quiz_"):
