@@ -15,12 +15,17 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
     def start_handler(message):
         """Handle the /start command with quiz ID."""
         chat_id = message.chat.id
-
+        chat_type = message.chat.type
         if len(message.text.split()) > 1:
             param = message.text.split()[1]
             if param.startswith("quiz_"):
                 quiz_id = param.split("_", 1)[1]
-                ask_user_ready(bot, chat_id, quiz_id)
+                if chat_type in ["group", "supergroup"]:
+                    # Group mode ke liye alag function call karo
+                    handle_group_quiz(bot, chat_id, quiz_id)
+                else:
+                    # Personal mode ke liye normal function call karo
+                    ask_user_ready(bot, chat_id, quiz_id)
             else:
                 bot.send_message(chat_id, "Invalid parameter. Please check the link.")
         else:
@@ -293,31 +298,16 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
         if not quiz:
             bot.send_message(message.chat.id, f"No leaderboard found for Quiz ID: {quiz_id}")
             return
-        title = quiz["title"]
-        leaderboard = quiz.get("leaderboard", [])
-        sorted_leaderboard = sorted(leaderboard, key=lambda x: x["score"], reverse=True)
-        # Limit entries (set max_entries = 20)
-        max_entries = 20
-        leaderboard = leaderboard[:max_entries]
-        leaderboard_text = f"📊 Leaderboard for '{title}':\n\n"
-        message_parts = []  # ✅ Initialize message_parts before use
 
+        leaderboard = quiz.get("leaderboard", [])
+        leaderboard = sorted(leaderboard, key=lambda x: x["score"], reverse=True)
+
+        leaderboard_text = f"📊 Leaderboard for '{quiz_title}':\n\n"
         for rank, entry in enumerate(sorted_leaderboard, start=1):
             user_display_name = get_user_display_name(bot, entry["chat_id"])
-            line = f"{rank}. {user_display_name} - {entry['score']} points\n"
-        
-            # Check if message length exceeds Telegram's limit
-            if len(leaderboard_text) + len(line) > 4000:
-                message_parts.append(leaderboard_text)  # Save current part
-                leaderboard_text = ""  # Start a new message
+            leaderboard_text += f"{rank}. {user_display_name} - {entry['score']} points\n"
 
-            leaderboard_text += line
-
-        message_parts.append(leaderboard_text)  # Add last part
-
-        # Send messages
-        for part in message_parts:
-            bot.send_message(message.chat.id, part)
+        bot.send_message(message.chat.id, leaderboard_text)
 
 
     @bot.poll_answer_handler()
@@ -399,3 +389,116 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
 
                 # Process user's answer and move to the next question
                 process_answer(bot, chat_id, quiz_id, selected_option)
+
+
+    def handle_group_quiz(bot, chat_id, quiz_id):
+        """Handle quiz flow in groups."""
+        quiz = saved_quizzes.get(quiz_id)
+        if not quiz:
+            bot.send_message(chat_id, f"No quiz found with ID: {quiz_id}")
+            return
+    
+        title = quiz["title"]
+        timer = quiz["timer"]
+        questions = quiz["questions"]
+    
+        active_quizzes[chat_id] = {
+            "quiz_id": quiz_id,
+            "questions": questions,
+            "current_index": 0,
+            "responses": {},  # Store user responses
+            "start_time": time.time(),
+            "timer": timer,
+            "submitted": False
+        }
+    
+        bot.send_message(
+            chat_id,
+            f"📢 **{title}** quiz is starting now! ⏳ You have {timer // 60} min {timer % 60} sec to complete it.",
+            parse_mode="Markdown"
+        )
+    
+        threading.Thread(target=group_quiz_timer, args=(bot, chat_id, timer)).start()
+        send_next_question(bot, chat_id)
+
+    def send_next_question(bot, chat_id):
+        """Send the next question in the quiz."""
+        quiz_data = active_quizzes.get(chat_id)
+        if not quiz_data or quiz_data["submitted"]:
+            return
+    
+        index = quiz_data["current_index"]
+        questions = quiz_data["questions"]
+    
+        if index >= len(questions):
+            return  # No more questions
+    
+        question = questions[index]
+        question_text = question["question"]
+        options = question["options"]
+    
+        markup = InlineKeyboardMarkup()
+        for i, option in enumerate(options):
+            markup.add(InlineKeyboardButton(option, callback_data=f"ans_{chat_id}_{index}_{i}"))
+    
+        bot.send_message(chat_id, f"❓ {question_text}", reply_markup=markup)
+
+    def handle_answer(bot, call):
+        """Handle user answer selection."""
+        data = call.data.split("_")
+        chat_id = int(data[1])
+        question_index = int(data[2])
+        user_id = call.from_user.id
+    
+        if chat_id not in active_quizzes:
+            return
+    
+        active_quizzes[chat_id]["responses"][user_id] = question_index
+        active_quizzes[chat_id]["current_index"] += 1
+        send_next_question(bot, chat_id)
+
+    def group_quiz_timer(bot, chat_id, duration):
+        """Manage quiz timer and auto-submit after time runs out."""
+        time.sleep(duration)
+    
+        if chat_id in active_quizzes and not active_quizzes[chat_id]["submitted"]:
+            active_quizzes[chat_id]["submitted"] = True
+            show_answer_key(bot, chat_id)
+            show_leaderboard(bot, chat_id)
+
+    def show_answer_key(bot, chat_id):
+        """Display the answer key after quiz completion."""
+        quiz_data = active_quizzes.get(chat_id)
+        if not quiz_data:
+            return
+    
+        quiz_id = quiz_data["quiz_id"]
+        questions = saved_quizzes[quiz_id]["questions"]
+    
+        answer_text = "📖 **Answer Key:**\n"
+        for i, question in enumerate(questions):
+            answer_text += f"{i+1}. {question['question']}\n✅ {question['correct_option']}\n\n"
+    
+        bot.send_message(chat_id, answer_text, parse_mode="Markdown")
+
+    def show_leaderboard(bot, chat_id):
+        """Display the leaderboard based on responses."""
+        quiz_data = active_quizzes.get(chat_id)
+        if not quiz_data:
+            return
+    
+        responses = quiz_data["responses"]
+        leaderboard = sorted(responses.items(), key=lambda x: x[1], reverse=True)
+    
+        leaderboard_text = "🏆 **Leaderboard:**\n"
+        for rank, (user_id, score) in enumerate(leaderboard, start=1):
+            user = bot.get_chat(user_id)
+            leaderboard_text += f"{rank}. {user.first_name} - {score} points\n"
+    
+        bot.send_message(chat_id, leaderboard_text, parse_mode="Markdown")
+
+
+
+
+
+    
