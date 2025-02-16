@@ -426,8 +426,9 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
         quiz_data = active_quizzes.get(chat_id)
         if not quiz_data or quiz_data["submitted"]:
             return
-    
-        index = quiz_data["current_index"]
+        
+
+        index = quiz_data["correct_option_id"]
         questions = quiz_data["questions"]
     
         if index >= len(questions):
@@ -441,7 +442,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             options=question["options"],
             is_anonymous=True,
             type="quiz",
-            correct_option_id=question["correct_index"],
+            correct_option_id=question["correct_option_id"],
             allows_multiple_answers=False
         )
 
