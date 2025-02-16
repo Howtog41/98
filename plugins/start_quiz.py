@@ -216,9 +216,11 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             # Fetch existing leaderboard or initialize if missing
             leaderboard = quiz.get("leaderboard", [])
 
+             # ✅ Fix: Convert to list if stored as a dictionary
+            if isinstance(leaderboard, dict):
+                leaderboard = list(leaderboard.values())
             # Print for debugging
-            print(f"📊 DEBUG: Loaded Leaderboard from DB -> {leaderboard}")
-
+            
             # Check if user already exists in leaderboard
             user_exists = any(entry["chat_id"] == chat_id for entry in leaderboard)
             if not user_exists:
@@ -233,9 +235,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
                 {"$set": {"leaderboard": leaderboard, "participants": len(leaderboard)}}
             )
 
-            # Print update result for debugging
-            print(f"✅ DEBUG: MongoDB Update Result -> {update_result.modified_count}")
-
+           
             # Get user rank
             rank = next((i + 1 for i, entry in enumerate(leaderboard) if entry["chat_id"] == chat_id), None)
             if rank is None:
