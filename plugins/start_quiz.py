@@ -444,7 +444,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             is_anonymous=True,
             type="quiz",
             correct_option_id=question["correct_option_id"],
-            allows_multiple_answers=False
+            allows_multiple_answers=False,
             explanation="",  # ❌ Explanation HATA do taaki answer reveal NA ho
             explanation_parse_mode="Markdown"
         )
