@@ -443,10 +443,11 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             options=question["options"],
             is_anonymous=True,
             type="quiz",
-            correct_option_id=question["correct_index"],
+            correct_option_id=question["correct_option_id"],
             allows_multiple_answers=False
         )
-
+        # Move to the next question
+        quiz_data["current_index"] = current_index + 1
 
     
     def handle_poll_answer(bot, poll_answer):
