@@ -61,23 +61,23 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
 
         start_quiz_handler(bot, chat_id, quiz_id)
 
-    def start_quiz_handler(bot, chat_id, quiz_id):
+    
+    async def start_quiz_handler(bot, chat_id, quiz_id):
         """Start a quiz given its ID."""
         quiz = saved_quizzes.get(quiz_id)
         if not quiz:
-            bot.send_message(chat_id, f"No quiz found with ID: {quiz_id}")
+            await bot.send_message(chat_id, f"No quiz found with ID: {quiz_id}")
             return
 
         with lock:
             if chat_id in active_quizzes:
-                bot.send_message(
-                chat_id, 
-                "📢 *आप पहले से ही एक क्विज़ में भाग ले रहे हैं\\!* ⏳\n"
-                "कृपया पहले इसे पूर्ण करें, तभी आप नई क्विज़ प्रारंभ कर सकेंगे\\! ✅\n"
-                "जब तक वर्तमान क्विज़ संपन्न नहीं होती, नई क्विज़ आरंभ नहीं होगी\\! 🚫",
-                parse_mode="MarkdownV2"
+                await bot.send_message(
+                    chat_id, 
+                    "📢 *आप पहले से ही एक क्विज़ में भाग ले रहे हैं\\!* ⏳\n"
+                    "कृपया पहले इसे पूर्ण करें, तभी आप नई क्विज़ प्रारंभ कर सकेंगे\\! ✅\n"
+                    "जब तक वर्तमान क्विज़ संपन्न नहीं होती, नई क्विज़ आरंभ नहीं होगी\\! 🚫",
+                    parse_mode="MarkdownV2"
                 )
-
                 return
 
             # Initialize active quiz session
@@ -86,15 +86,20 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
                 "chat_id": chat_id,
                 "score": 0,
                 "current_question_index": 0,
-                "start_time": time.time(),
-                "end_time": time.time() + quiz["timer"],
-                "last_activity": time.time(),  # Track last activity time
+                "start_time": asyncio.get_event_loop().time(),  # ✅ Use asyncio time
+                "end_time": asyncio.get_event_loop().time() + quiz["timer"],
+                "last_activity": asyncio.get_event_loop().time(),
                 "paused": False
             }
 
-        bot.send_message(chat_id, "The quiz is starting now! Good luck!")
-        threading.Thread(target=quiz_timer, args=(bot, chat_id, quiz_id, quiz["timer"]), daemon=True).start()
-        send_question(bot, chat_id, quiz_id, 0)
+        await bot.send_message(chat_id, "The quiz is starting now! Good luck!")
+
+        # ✅ Correct way to start quiz timer asynchronously
+        asyncio.create_task(quiz_timer(bot, chat_id, quiz_id, quiz["timer"]))
+
+        # ✅ Send first question asynchronously
+        await send_question(bot, chat_id, quiz_id, 0)
+
 
 
     async def quiz_timer(bot, chat_id, quiz_id, duration):
@@ -140,47 +145,50 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
         await bot.send_message(chat_id, "⏰ Time's up! The quiz has ended.")
         await finalize_quiz(bot, chat_id)
 
-
-    def send_question(bot, chat_id, quiz_id, question_index):
+    async def send_question(bot, chat_id, quiz_id, question_index):
         """Send a question to the user."""
         with lock:
             if chat_id in active_quizzes:
-                active_quizzes[chat_id]["last_activity"] = time.time()
+                active_quizzes[chat_id]["last_activity"] = asyncio.get_event_loop().time()
+
         quiz = saved_quizzes.get(quiz_id)
         if not quiz:
-            bot.send_message(chat_id, "Quiz not found.")
+            await bot.send_message(chat_id, "Quiz not found.")
             return
 
         questions = quiz["questions"]
-        total_questions = len(questions) 
+        total_questions = len(questions)
         if question_index >= len(questions):
-            finalize_quiz(bot, chat_id)
+            await finalize_quiz(bot, chat_id)
             return
 
         question = questions[question_index]
         pre_poll_message = question.get("pre_poll_message")
+    
         if pre_poll_message:
             if pre_poll_message["type"] == "text":
-                bot.send_message(chat_id, pre_poll_message["content"])
+                await bot.send_message(chat_id, pre_poll_message["content"])
             elif pre_poll_message["type"] == "photo":
-                bot.send_photo(chat_id, pre_poll_message["content"])
+                await bot.send_photo(chat_id, pre_poll_message["content"])
             elif pre_poll_message["type"] == "video":
-                bot.send_video(chat_id, pre_poll_message["content"])
+                await bot.send_video(chat_id, pre_poll_message["content"])
 
         # Add numbering to the question
         numbered_question = f"Q{question_index + 1}/{total_questions}: {question['question']}"
-    
-        
-        bot.send_poll(
+
+        await bot.send_poll(
             chat_id=chat_id,
             question=numbered_question,
             options=question["options"],
             type="quiz",
             correct_option_id=question["correct_option_id"],
             explanation=question["explanation"],
-            is_anonymous=False  # Ensure this is not passed twice
+            is_anonymous=False
         )
-        threading.Thread(target=check_inactivity, args=(bot, chat_id, quiz_id), daemon=True).start()
+
+        # ✅ Instead of threading.Thread, use asyncio.create_task
+        asyncio.create_task(check_inactivity(bot, chat_id, quiz_id))
+    
     def get_user_display_name(bot, chat_id):
         """Fetch user's display name (username or first + last name)."""
         try:
@@ -323,7 +331,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
 
 
     @bot.poll_answer_handler()
-    def handle_poll_answer(poll_answer):
+    async def handle_poll_answer(poll_answer):
         """Handle user answers and send the next question."""
         user_id = poll_answer.user.id
         with lock:
@@ -334,35 +342,31 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             quiz_id = quiz_data["quiz_id"]
             question_index = quiz_data.get("current_question_index", 0)
 
-
             # ✅ Jab bhi user answer tick kare, quiz active ho jaye
             active_quizzes[user_id]["paused"] = False
-            active_quizzes[user_id]["last_activity"] = time.time()
+            active_quizzes[user_id]["last_activity"] = asyncio.get_event_loop().time()
 
             # ✅ Agar quiz paused thi, to timer resume kare
             remaining_time = active_quizzes[user_id].get("remaining_time", 0)
             if remaining_time > 0:
-                threading.Thread(target=quiz_timer, args=(bot, user_id, quiz_id, remaining_time), daemon=True).start()
+                asyncio.create_task(quiz_timer(bot, user_id, quiz_id, remaining_time))
                 active_quizzes[user_id].pop("remaining_time", None)  # Timer reset kare
 
-            
-            # Check answer correctness
+            # ✅ Check answer correctness
             correct_option_id = saved_quizzes[quiz_id]["questions"][question_index]["correct_option_id"]
             if poll_answer.option_ids[0] == correct_option_id:
                 quiz_data["score"] += 1
 
-            # Move to next question
+            # ✅ Move to next question
             quiz_data["current_question_index"] += 1
 
-            
-            
         next_question_index = quiz_data["current_question_index"]
 
-    # Send the next question or finalize the quiz if completed
+        # ✅ Send the next question or finalize the quiz if completed
         if next_question_index < len(saved_quizzes[quiz_id]["questions"]):
-            send_question(bot, quiz_data["chat_id"], quiz_id, next_question_index)
+            await send_question(bot, quiz_data["chat_id"], quiz_id, next_question_index)
         else:
-            finalize_quiz(bot, quiz_data["chat_id"])
+            await finalize_quiz(bot, quiz_data["chat_id"])
 
     def check_inactivity(bot, chat_id, quiz_id):
         """Check if the user is inactive and pause the quiz."""
@@ -382,7 +386,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
 
 
     @bot.callback_query_handler(func=lambda call: call.data.startswith("mcq_"))
-    def handle_mcq_selection(call):
+    async def handle_mcq_selection(call):
         """Handle MCQ selection and auto-resume if paused."""
         chat_id = call.message.chat.id
         quiz_id, selected_option = call.data.split("_", 2)[1:]
@@ -390,14 +394,14 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
         with lock:
             if chat_id in active_quizzes:
                 if active_quizzes[chat_id].get("paused"):
-                    # Auto-resume the quiz when user selects an MCQ
+                    # ✅ Auto-resume the quiz when user selects an MCQ
                     active_quizzes[chat_id]["paused"] = False
-                    active_quizzes[chat_id]["last_activity"] = time.time()
-                
+                    active_quizzes[chat_id]["last_activity"] = asyncio.get_event_loop().time()
+            
                     remaining_time = active_quizzes[chat_id].get("remaining_time", 0)
                     if remaining_time > 0:
-                        threading.Thread(target=quiz_timer, args=(bot, chat_id, quiz_id, remaining_time), daemon=True).start()
+                        asyncio.create_task(quiz_timer(bot, chat_id, quiz_id, remaining_time))
                         active_quizzes[chat_id].pop("remaining_time", None)
 
-                # Process user's answer and move to the next question
-                process_answer(bot, chat_id, quiz_id, selected_option)
+        # ✅ Process user's answer and move to the next question
+        await process_answer(bot, chat_id, quiz_id, selected_option)
