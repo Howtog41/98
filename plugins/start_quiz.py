@@ -1,5 +1,6 @@
 import threading
 import time
+import asyncio
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 
@@ -95,23 +96,31 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
         threading.Thread(target=quiz_timer, args=(bot, chat_id, quiz_id, quiz["timer"]), daemon=True).start()
         send_question(bot, chat_id, quiz_id, 0)
 
-    def quiz_timer(bot, chat_id, quiz_id, duration):
+
+    async def quiz_timer(bot, chat_id, quiz_id, duration):
         """Run a timer for the quiz and auto-submit on expiry."""
-        end_time = time.time() + duration
+        end_time = asyncio.get_event_loop().time() + duration  # Use asyncio time
 
         while True:
+            await asyncio.sleep(1)  # ✅ Non-blocking sleep
+
             with lock:
+                # ✅ Agar quiz delete ho gaya, to timer band ho jaye
                 if chat_id not in active_quizzes or active_quizzes[chat_id]["quiz_id"] != quiz_id:
                     return  
 
+                # ✅ Agar quiz paused hai, to wait kare, lekin loop continue rakhe
                 if active_quizzes[chat_id].get("paused"):
-                    active_quizzes[chat_id]["remaining_time"] = int(end_time - time.time())
-                    return  # Timer stops when quiz is paused
-            
-            remaining_time = int(end_time - time.time())
+                    active_quizzes[chat_id]["remaining_time"] = int(end_time - asyncio.get_event_loop().time())
+                    await asyncio.sleep(1)  # ✅ Wait and retry instead of returning
+                    continue  # Loop ko chalne do
+
+            # ✅ Remaining time calculate kare
+            remaining_time = int(end_time - asyncio.get_event_loop().time())
             if remaining_time <= 0:
-                break  # Time expired
-                
+                break  # ⏰ Time expired
+
+            # ✅ Specific time pe warning bheje
             if remaining_time in [10500, 7200, 3600, 1800, 900, 600, 300, 60, 30, 20, 10, 5, 3, 1]:
                 hours, remainder = divmod(remaining_time, 3600)
                 minutes, seconds = divmod(remainder, 60)
@@ -125,19 +134,12 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
                     time_parts.append(f"{seconds} second{'s' if seconds > 1 else ''}")
 
                 time_str = " and ".join(time_parts)
-                bot.send_message(chat_id, f"⏳ Time left: {time_str}")
+                await bot.send_message(chat_id, f"⏳ Time left: {time_str}")
 
+        # ⏰ Auto-submit the quiz when time runs out
+        await bot.send_message(chat_id, "⏰ Time's up! The quiz has ended.")
+        await finalize_quiz(bot, chat_id)
 
-            time.sleep(1)
-
-            # Check if the quiz was completed manually
-            with lock:
-                if chat_id not in active_quizzes or active_quizzes[chat_id]["quiz_id"] != quiz_id:
-                    return
-
-        # Auto-submit the quiz when time runs out
-        bot.send_message(chat_id, "⏰ Time's up! The quiz has ended.")
-        finalize_quiz(bot, chat_id)
 
     def send_question(bot, chat_id, quiz_id, question_index):
         """Send a question to the user."""
@@ -365,11 +367,11 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
     def check_inactivity(bot, chat_id, quiz_id):
         """Check if the user is inactive and pause the quiz."""
         while True:
-            time.sleep(30)  # 5 minutes wait
+            time.sleep(300)  # 5 minutes wait
             with lock:
                 if chat_id in active_quizzes:
                     last_activity = active_quizzes[chat_id]["last_activity"]
-                    if time.time() - last_activity >= 30:  # 5 minutes of inactivity
+                    if time.time() - last_activity >= 300:  # 5 minutes of inactivity
                         active_quizzes[chat_id]["paused"] = True
                         bot.send_message(
                             chat_id,
