@@ -445,6 +445,8 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             type="quiz",
             correct_option_id=question["correct_option_id"],
             allows_multiple_answers=False
+            explanation="",  # ❌ Explanation HATA do taaki answer reveal NA ho
+            explanation_parse_mode="Markdown"
         )
         # Move to the next question
         quiz_data["current_index"] = current_index + 1
@@ -456,6 +458,13 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
         user_id = poll_answer.user.id
         selected_option = poll_answer.option_ids[0]  # Only one option is selected
 
+        # ✅ Correct way to find the chat ID (use `active_quizzes`)
+        for chat in active_quizzes:
+            if active_quizzes[chat]["quiz_id"] == chat_id:
+                chat_id = chat
+                break
+        else:
+            return  # Quiz nahi mila, exi
     
         if chat_id not in active_quizzes:
             return
