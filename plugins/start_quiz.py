@@ -3,15 +3,15 @@ import time
 import asyncio
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-
 active_quizzes = {}
 lock = threading.Lock()  # Thread-safe lock for active_quizzes
 saved_quizzes = {}
 leaderboards = {}  # Store leaderboards for each quiz
 
 def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, quizzes_collection):
-    global db_collection  # Define it globally within this module
-    db_collection = quizzes_collection  # Assign MongoDB collection to a local variable
+    global db_collection
+    db_collection = quizzes_collection  
+
     @bot.message_handler(commands=["start"])
     def start_handler(message):
         """Handle the /start command with quiz ID."""
@@ -34,7 +34,6 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             bot.send_message(chat_id, f"No quiz found with ID: {quiz_id}")
             return
 
-        
         title = quiz["title"]
         timer = quiz["timer"]
         minutes, seconds = divmod(timer, 60)
@@ -42,6 +41,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
         
         markup = InlineKeyboardMarkup()
         markup.add(InlineKeyboardButton("I'm Ready", callback_data=f"start_quiz_{quiz_id}"))
+
         bot.send_message(
             chat_id,
             f"📝 **Quiz Title:** {title}\n⏳ **Duration:** {time_str}\n\n🎉 **Are you ready to begin?**\n\n📢 *Aapko har minute par bataya jayega ki kitna time bacha hai!*",
@@ -49,6 +49,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             parse_mode="Markdown"
         )
 
+    # ✅ Corrected: Async Callback Handler for Inline Button
     @bot.callback_query_handler(func=lambda call: call.data.startswith("start_quiz_"))
     async def handle_start_quiz(call):
         """Handle the 'I'm Ready' button click."""
@@ -56,11 +57,12 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
         chat_id = call.message.chat.id
         message_id = call.message.message_id
 
-        # Remove the inline button by editing the message
+        # Remove the inline button
         await bot.edit_message_reply_markup(chat_id, message_id, reply_markup=None)
 
-        # ✅ Now we can directly await the async function
+        # ✅ Ensure we await the quiz start function
         await start_quiz_handler(bot, chat_id, quiz_id)
+
 
 
     
