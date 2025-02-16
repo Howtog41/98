@@ -449,7 +449,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
         quiz_data["current_index"] = current_index + 1
 
     
-    def handle_poll_answer(bot, poll_answer):
+    def handle_group_poll_answer(bot, poll_answer):
         """Store user poll response."""
         chat_id = poll_answer.poll_id  # Poll ID as identifier
         user_id = poll_answer.user.id
