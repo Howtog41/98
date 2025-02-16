@@ -8,6 +8,8 @@ saved_quizzes = {}
 leaderboards = {}  # Store leaderboards for each quiz
 
 def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, quizzes_collection):
+    global db_collection  # Define it globally within this module
+    db_collection = quizzes_collection  # Assign MongoDB collection to a local variable
     @bot.message_handler(commands=["start"])
     def start_handler(message):
         """Handle the /start command with quiz ID."""
@@ -50,6 +52,11 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
         """Handle the 'I'm Ready' button click."""
         quiz_id = call.data.split("_", 2)[2]
         chat_id = call.message.chat.id
+        message_id = call.message.message_id  # Get message ID
+
+        # Remove the inline button by editing the message
+        bot.edit_message_reply_markup(chat_id, message_id, reply_markup=None)
+
         start_quiz_handler(bot, chat_id, quiz_id)
 
     def start_quiz_handler(bot, chat_id, quiz_id):
@@ -84,9 +91,9 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
 
         while time.time() < end_time:
             remaining_time = int(end_time - time.time())
-            if remaining_time % 60 == 0 or remaining_time <= 10:
-                hours, minutes = divmod(remaining_time, 3600)
-                minutes, seconds = divmod(minutes, 60)
+            if remaining_time in [10500, 7200, 3600, 1800, 900, 600, 300, 60, 30, 20, 10, 5, 3, 1]:
+                hours, remainder = divmod(remaining_time, 3600)
+                minutes, seconds = divmod(remainder, 60)
                 time_parts = []
                 if hours > 0:
                     time_parts.append(f"{hours} hour{'s' if hours > 1 else ''}")
@@ -145,6 +152,20 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             is_anonymous=False  # Ensure this is not passed twice
         )
 
+    def get_user_display_name(bot, chat_id):
+        """Fetch user's display name (username or first + last name)."""
+        try:
+            user_info = bot.get_chat(chat_id)
+            if user_info.username:
+                return f"@{user_info.username}"
+            elif user_info.first_name:
+                return f"{user_info.first_name} {user_info.last_name}".strip() if user_info.last_name else user_info.first_name
+            else:
+                return f"User {chat_id}"  # Fallback if no name is available
+        except Exception:
+            return f"User {chat_id}"  # Fallback in case of an error
+
+    
     def finalize_quiz(bot, chat_id):
         """Finalize the quiz and show the user's score."""
         with lock:
@@ -224,7 +245,6 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             # Send leaderboard message
             bot.edit_message_text(leaderboard_text, chat_id, message_id=loading_msg.message_id)
 
-
     def is_admin(chat_id):
         admin_ids = [1922012735]  # Replace with actual admin IDs
         return chat_id in admin_ids
@@ -232,7 +252,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
     @bot.message_handler(commands=["leaderboard"])
     def leaderboard_handler(message):
         """Allow admin to view the leaderboard."""
-        if not is_admin(message.chat.id):  # Replace withjk your admin check logic
+        if not is_admin(message.chat.id):  # Replace with your admin check logic
             bot.send_message(message.chat.id, "You are not authorized to view the leaderboard.")
             return
 
