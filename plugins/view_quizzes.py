@@ -58,7 +58,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             InlineKeyboardButton("✏️ Edit Quiz", callback_data=f"edit_quiz_{quiz_id}"),
             InlineKeyboardButton("🔗 Share Quiz", callback_data=f"share_quiz_{quiz_id}")
         )
-        markup.row(InlineKeyboardButton("🔙 Back", callback_data="view_quizzes_1"))
+        markup.row(InlineKeyboardButton("🔙 Back", callback_data="view_quizzes"))
 
         bot.edit_message_text(
             chat_id=call.message.chat.id,
@@ -114,8 +114,13 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
         bot_username = bot.get_me().username
         share_link = f"https://t.me/{bot_username}?start=quiz_{quiz_id}"
         markup = InlineKeyboardMarkup()
-        markup.row(InlineKeyboardButton("🔙 Back", callback_data=f"view_quiz_{quiz_id}"))
-
+        markup.row(
+            InlineKeyboardButton("▶️ Start Quiz", callback_data=f"start_quiz_{quiz_id}")
+        )
+        markup.row(
+            InlineKeyboardButton("🔗 Share", url=share_link),
+            InlineKeyboardButton("🔙 Back", callback_data=f"view_quiz_{quiz_id}")
+        )
         bot.edit_message_text(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
@@ -126,3 +131,97 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             reply_markup=markup,
             parse_mode="Markdown"
         )
+
+
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("edit_title_"))
+    def edit_title(call):
+        """Ask the user to send a new title for the quiz."""
+        quiz_id = call.data.split("_")[2]
+        quiz = saved_quizzes.get(quiz_id)
+        if not quiz:
+            bot.answer_callback_query(call.id, "Quiz not found.")
+            return
+
+        bot.answer_callback_query(call.id)
+        msg = bot.send_message(call.message.chat.id, "✏️ Send the new title for this quiz:")
+    
+        # Save quiz ID to track user input
+        bot.register_next_step_handler(msg, update_title, quiz_id)
+
+
+    def update_title(message, quiz_id):
+        """Update the quiz title."""
+        new_title = message.text.strip()
+    
+        if not new_title:
+            bot.send_message(message.chat.id, "🚫 Title cannot be empty. Try again.")
+            return
+
+        if quiz_id in saved_quizzes:
+            saved_quizzes[quiz_id]['title'] = new_title
+            # Update in MongoDB
+            quizzes_collection.update_one({"quiz_id": quiz_id}, {"$set": {"title": new_title}})
+            bot.send_message(message.chat.id, "✅ Quiz title updated successfully!")
+        else:
+            bot.send_message(message.chat.id, "⚠️ Quiz not found.")
+
+
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("edit_questions_"))
+    def edit_questions(call):
+        """Display options to add/remove/edit questions."""
+        quiz_id = call.data.split("_")[2]
+        quiz = saved_quizzes.get(quiz_id)
+    
+        if not quiz:
+            bot.answer_callback_query(call.id, "Quiz not found.")
+            return
+
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton("➕ Add Question", callback_data=f"add_question_{quiz_id}"))
+        markup.add(InlineKeyboardButton("✏️ Edit Question", callback_data=f"modify_question_{quiz_id}"))
+        markup.add(InlineKeyboardButton("❌ Remove Question", callback_data=f"remove_question_{quiz_id}"))
+        markup.add(InlineKeyboardButton("🔙 Back", callback_data=f"view_quiz_{quiz_id}"))
+
+        bot.edit_message_text(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            text=f"📄 **Editing Questions for Quiz:** {quiz['title']}\n\nChoose an option below:",
+            reply_markup=markup,
+            parse_mode="Markdown"
+        )
+
+
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("edit_timer_"))
+    def edit_timer(call):
+        """Ask the user to send a new timer duration in seconds."""
+        quiz_id = call.data.split("_")[2]
+        quiz = saved_quizzes.get(quiz_id)
+    
+        if not quiz:
+            bot.answer_callback_query(call.id, "Quiz not found.")
+            return
+
+        bot.answer_callback_query(call.id)
+        msg = bot.send_message(call.message.chat.id, "⏳ Send the new duration for this quiz (in seconds):")
+    
+        # Save quiz ID to track user input
+        bot.register_next_step_handler(msg, update_timer, quiz_id)
+
+
+    def update_timer(message, quiz_id):
+        """Update the quiz timer."""
+        try:
+            new_timer = int(message.text.strip())
+            if new_timer <= 0:
+                raise ValueError
+        except ValueError:
+            bot.send_message(message.chat.id, "🚫 Invalid input. Please enter a valid number in seconds.")
+            return
+
+        if quiz_id in saved_quizzes:
+            saved_quizzes[quiz_id]['timer'] = new_timer
+            # Update in MongoDB
+            quizzes_collection.update_one({"quiz_id": quiz_id}, {"$set": {"timer": new_timer}})
+            bot.send_message(message.chat.id, "✅ Quiz timer updated successfully!")
+        else:
+            bot.send_message(message.chat.id, "⚠️ Quiz not found.")
