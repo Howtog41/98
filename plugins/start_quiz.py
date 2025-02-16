@@ -455,20 +455,18 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
         user_id = poll_answer.user.id
         selected_option = poll_answer.option_ids[0]  # Only one option is selected
 
-        # ✅ Correct way to find the chat ID (use `active_quizzes`)
-        for chat in active_quizzes:
-            if active_quizzes[chat]["quiz_id"] == chat_id:
-                chat_id = chat
-                break
-        else:
-            return  # Quiz nahi mila, exi
     
         if chat_id not in active_quizzes:
             return
-    
-        active_quizzes[chat_id]["responses"][user_id] = selected_option
-        active_quizzes[chat_id]["current_index"] += 1
-        send_next_poll(bot, chat_id)
+
+        quiz_data = active_quizzes[chat_id]
+        # ✅ Pehle user ka response store karo
+        if user_id not in quiz_data["responses"]:
+            quiz_data["responses"][user_id] = selected_option
+
+            # ✅ Pehle user ke answer dete hi next MCQ bhejo
+            send_next_poll(bot, chat_id)
+        
 
     def group_quiz_timer(bot, chat_id, duration):
         """Manage quiz timer and auto-submit after time runs out."""
