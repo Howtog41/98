@@ -428,13 +428,14 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             return
         
 
-        index = quiz_data["correct_option_id"]
+        # Ensure 'current_index' exists in quiz_data, default to 0
+        current_index = quiz_data.get("current_index", 0)
         questions = quiz_data["questions"]
-    
-        if index >= len(questions):
+
+        if current_index >= len(questions):
             return  # No more questions
     
-        question = questions[index]
+        question = questions[current_index]
 
         bot.send_poll(
             chat_id,
@@ -442,7 +443,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             options=question["options"],
             is_anonymous=True,
             type="quiz",
-            correct_option_id=question["correct_option_id"],
+            correct_option_id=question["correct_index"],
             allows_multiple_answers=False
         )
 
