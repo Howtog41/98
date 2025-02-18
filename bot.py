@@ -32,7 +32,7 @@ async def extract_quiz_details(update: Update, context: ContextTypes.DEFAULT_TYP
     await update.message.reply_text(formatted_text, parse_mode="Markdown", disable_web_page_preview=True)
 
 def main():
-    app = Application.builder().token("YOUR_BOT_TOKEN").build()
+    app = Application.builder().token("8151017957:AAF15t0POw7oHaFjC-AySwvDmNyS3tZxbTI").build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, extract_quiz_details))
     print("Bot is running...")
     app.run_polling()
