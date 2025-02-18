@@ -1,17 +1,25 @@
-import re
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters, ContextTypes
 
 async def extract_quiz_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
-    # ✅ Extract quiz title and link using improved regex
-    quiz_matches = re.findall(
-        r"^(.*?)\s+by\s+@.*?\n.*?External sharing link:\s*(https://t\.me/QuizBot\?start=\S+)", 
-        text, re.MULTILINE | re.DOTALL
-    )
-    
-    if not quiz_matches:
+    lines = text.split("\n")
+    quizzes = []
+    title = None
+    link = None
+
+    for line in lines:
+        if "by @" in line:  
+            title = line.split(" by @")[0].strip()  # Extract title
+        elif "t.me/QuizBot?start=" in line:
+            link = line.strip()  # Extract link
+
+        if title and link:
+            quizzes.append((title, link))
+            title, link = None, None  # Reset for next quiz
+
+    if not quizzes:
         await update.message.reply_text("⚠ कोई वैध क्विज नहीं मिली! कृपया सही फॉरवर्ड किया गया मैसेज भेजें।", parse_mode="Markdown")
         return
 
@@ -20,9 +28,9 @@ async def extract_quiz_details(update: Update, context: ContextTypes.DEFAULT_TYP
                      "📌 *अपनी तैयारी को अगले स्तर पर ले जाएं!*\n\n" \
                      "✦━━━━━━━━━━━━━━✦\n"
 
-    for title, quiz_link in quiz_matches:
+    for title, quiz_link in quizzes:
         formatted_text += (
-            f"📖 ── *{title.strip()}* ── 📖\n"
+            f"📖 ── *{title}* ── 📖\n"
             f"📝 [Start Quiz]({quiz_link})\n"
             "----------------------------------\n"
         )
