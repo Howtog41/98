@@ -1,342 +1,66 @@
-import telebot
-import threading
-import random
-import string
-import time
-from pymongo import MongoClient
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
+# Store quizzes in dictionary {title: link}
+quiz_data = {}
+admin_id = 1922012735 # Change this to your Telegram user ID
 
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Send /generate_quiz_list to start adding quizzes.")
 
-
-active_timers = {}
-
-# Telegram Bot Token
-BOT_TOKEN = '8151017957:AAEhEOxbwjnw6Fxu1GzPwHTVhUeIpibpJqI'
-bot = telebot.TeleBot(BOT_TOKEN)
-
-# MongoDB connection
-MONGO_URI = "mongodb+srv://latestkoreandraama:UjebJR51Dki7Ili2@cluster0.nnnuejc.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-client = MongoClient(MONGO_URI)
-db = client['quiz_bot']
-
-# MongoDB Collections
-quizzes_collection = db['quizzes']
-sessions_collection = db['sessions']
-leaderboard_collection = db['leaderboards']
-
-# Generate a unique quiz ID
-def generate_quiz_id():
-    return ''.join(random.choices(string.ascii_letters + string.digits, k=6))
-
-# Start creating a quiz
-@bot.message_handler(commands=['create_quiz'])
-def create_quiz(message):
-    chat_id = message.chat.id
-
-    # Prevent multiple quiz creations at once
-    if quizzes_collection.find_one({"chat_id": chat_id, "status": "creating"}):
-        bot.send_message(chat_id, "You're already creating a quiz. Complete it or use /cancel_quiz to start over.")
+async def generate_quiz_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.from_user.id != admin_id:
+        await update.message.reply_text("You are not authorized to use this command.")
         return
-
-    quizzes_collection.insert_one({
-        "chat_id": chat_id,
-        "title": None,
-        "questions": [],
-        "timer": None,
-        "quiz_id": generate_quiz_id(),
-        "status": "creating"
-    })
-    bot.send_message(chat_id, "Please send the quiz title.")
-
-# Set the quiz title
-@bot.message_handler(func=lambda message: quizzes_collection.find_one({"chat_id": message.chat.id, "status": "creating", "title": None}))
-def set_quiz_title(message):
-    chat_id = message.chat.id
-    quizzes_collection.update_one(
-        {"chat_id": chat_id, "status": "creating"},
-        {"$set": {"title": message.text}}
-    )
-    bot.send_message(chat_id, "Quiz title saved! Now forward polls from your channel to add them to the quiz.\nType /done when you're finished.")
-
-# Handle forwarded polls
-@bot.message_handler(content_types=['poll'])
-def handle_forwarded_poll(message):
-    chat_id = message.chat.id
-    quiz = quizzes_collection.find_one({"chat_id": chat_id, "status": "creating"})
-
-    if not quiz:
-        bot.send_message(chat_id, "You are not currently creating a quiz. Use /create_quiz to start.")
-        return
-
-    poll = message.poll
-    quizzes_collection.update_one(
-        {"chat_id": chat_id, "status": "creating"},
-        {"$push": {"questions": {
-            "question": poll.question,
-            "options": [option.text for option in poll.options],
-            "correct_option_id": poll.correct_option_id,
-            "explanation": poll.explanation or "No explanation provided."
-        }}}
-    )
-    bot.send_message(chat_id, f"Poll added: {poll.question}\nSend another poll or type /done to finish.")
-
-# Finish quiz creation
-@bot.message_handler(commands=['done'])
-def finish_quiz_creation(message):
-    chat_id = message.chat.id
-    quiz = quizzes_collection.find_one({"chat_id": chat_id, "status": "creating"})
-
-    if not quiz or not quiz.get("questions"):
-        bot.send_message(chat_id, "You haven't created any quiz or added any questions. Use /create_quiz to start.")
-        return
-
-    bot.send_message(chat_id, "Quiz creation complete! Please send the quiz duration in seconds (e.g., 180 for 3 minutes).")
-    quizzes_collection.update_one({"chat_id": chat_id, "status": "creating"}, {"$set": {"status": "awaiting_timer"}})
-
-# Set the quiz timer
-@bot.message_handler(func=lambda message: quizzes_collection.find_one({"chat_id": message.chat.id, "status": "awaiting_timer"}))
-def set_quiz_timer(message):
-    chat_id = message.chat.id
-    try:
-        timer = int(message.text)
-        if timer <= 0:
-            raise ValueError
-
-        quiz = quizzes_collection.find_one({"chat_id": chat_id, "status": "awaiting_timer"})
-        quizzes_collection.update_one(
-            {"chat_id": chat_id, "status": "awaiting_timer"},
-            {"$set": {"timer": timer, "status": "ready"}}
-        )
-
-        bot.send_message(chat_id, f"Quiz created successfully! 🎉\nQuiz ID: {quiz['quiz_id']}\nUse /view_quizzes to see all quizzes.")
-    except ValueError:
-        bot.send_message(chat_id, "Invalid input. Please send a valid number of seconds.")
-
-# View quizzes
-@bot.message_handler(commands=['view_quizzes'])
-def view_quizzes(message):
-    chat_id = message.chat.id
-    # Use count_documents to check the number of matching documents
-    count = quizzes_collection.count_documents({"chat_id": chat_id, "status": "ready"})
     
-    if count == 0:
-        bot.send_message(chat_id, "No quizzes available.")
-        return
+    quiz_data.clear()
+    await update.message.reply_text("Send quizzes in the format: `Title - Link`\nType 'Done' when finished.", parse_mode="Markdown")
+    context.user_data['adding_quiz'] = True
 
-    # Retrieve the matching quizzes
-    quizzes = quizzes_collection.find({"chat_id": chat_id, "status": "ready"})
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.user_data.get('adding_quiz', False):
+        return
     
-    response = "Your Quizzes:\n\n"
-    for quiz in quizzes:
-        title = quiz["title"]
-        questions_count = len(quiz["questions"])
-        response += f"{title} 📝 {questions_count} Questions\nStart: /start_{quiz['quiz_id']}\n\n"
-
-    bot.send_message(chat_id, response)
-
-
-# Start a quiz
-
-
-def start_quiz(message):
-    """Handle /start_<quiz_id> command."""
-    chat_id = message.chat.id
-    quiz_id = message.text.split("_", 1)[1]
-    quiz = quizzes_collection.find_one({"quiz_id": quiz_id, "status": "ready"})
-
-    if not quiz:
-        bot.send_message(chat_id, f"No quiz found with ID: {quiz_id}")
-        return
-
-    # Send "Ready" confirmation
-    ask_user_ready(chat_id, quiz_id)
-
-def ask_user_ready(chat_id, quiz_id):
-    """Ask user if they're ready to start the quiz."""
-    markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton("I'm Ready", callback_data=f"start_quiz_{quiz_id}"))
-    bot.send_message(chat_id, "Are you ready to start the quiz?", reply_markup=markup)
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith("start_quiz_"))
-def handle_start_quiz(call):
-    """Handle 'I'm Ready' button click."""
-    quiz_id = call.data.split("_", 2)[2]
-    chat_id = call.message.chat.id
-    quiz = quizzes_collection.find_one({"quiz_id": quiz_id, "status": "ready"})
-
-    if not quiz:
-        bot.send_message(chat_id, f"No quiz found with ID: {quiz_id}")
-        return
-
-    session = sessions_collection.find_one({"chat_id": chat_id, "quiz_id": quiz_id, "status": "active"})
-
-    if session:
-        bot.send_message(chat_id, "You're already in a quiz! Finish it first before starting a new one.")
-        return
-
-    # Initialize session
-    sessions_collection.insert_one({
-        "chat_id": chat_id,
-        "quiz_id": quiz_id,
-        "current_question": 0,
-        "score": 0,
-        "unanswered": [],
-        "status": "active"
-    })
-
-    bot.send_message(chat_id, "The quiz is starting now! Good luck!")
-    start_timer(chat_id, quiz_id, quiz["timer"])
-    send_question(chat_id, quiz_id, 0)
-
-def start_timer(chat_id, quiz_id, duration):
-    """Start a quiz timer."""
-    timer_thread = threading.Thread(target=quiz_timer, args=(chat_id, quiz_id, duration))
-    timer_thread.daemon = True
-    active_timers[chat_id] = timer_thread
-    timer_thread.start()
-
-def quiz_timer(chat_id, quiz_id, duration):
-    """Handle countdown and auto-submit when time expires."""
-    end_time = time.time() + duration
-
-    while time.time() < end_time:
-        remaining_time = int(end_time - time.time())
-
-        if remaining_time % 30 == 0 or remaining_time <= 10:
-            bot.send_message(chat_id, f"⏳ Time left: {remaining_time} seconds")
-
-        time.sleep(1)
-
-        # Check if quiz is manually ended
-        session = sessions_collection.find_one({"chat_id": chat_id, "quiz_id": quiz_id, "status": "active"})
-        if not session:
+    text = update.message.text.strip()
+    
+    if text.lower() == "done":
+        if not quiz_data:
+            await update.message.reply_text("No quizzes added! Please add some first.")
             return
-
-    bot.send_message(chat_id, "⏰ Time's up! The quiz has ended.")
-    finish_quiz(chat_id)
-    active_timers.pop(chat_id, None)
-
-def send_question(chat_id, quiz_id, question_index):
-    """Send a quiz question."""
-    quiz = quizzes_collection.find_one({"quiz_id": quiz_id, "status": "ready"})
-    questions = quiz["questions"]
-
-    if question_index >= len(questions):
-        finish_quiz(chat_id)
+        
+        formatted_message = generate_formatted_message()
+        await update.message.reply_text(formatted_message, parse_mode="Markdown", disable_web_page_preview=True)
+        context.user_data['adding_quiz'] = False
         return
-
-    question = questions[question_index]
-    sessions_collection.update_one(
-        {"chat_id": chat_id, "quiz_id": quiz_id, "status": "active"},
-        {"$set": {"current_question": question_index}}
-    )
-
-    bot.send_poll(
-        chat_id,
-        question["question"],
-        question["options"],
-        type="quiz",
-        correct_option_id=question["correct_option_id"],
-        is_anonymous=False,
-        explanation=question["explanation"]
-    )
-
-@bot.poll_answer_handler(func=lambda poll_answer: True)
-def handle_poll_answer(poll_answer):
-    """Handle user's poll answers."""
-    chat_id = poll_answer.user.id
-    session = sessions_collection.find_one({"chat_id": chat_id, "status": "active"})
-
-    if not session:
-        return
-
-    quiz_id = session["quiz_id"]
-    current_question = session["current_question"]
-    quiz = quizzes_collection.find_one({"quiz_id": quiz_id})
-
-    if poll_answer.option_ids[0] == quiz["questions"][current_question]["correct_option_id"]:
-        sessions_collection.update_one(
-            {"chat_id": chat_id, "quiz_id": quiz_id, "status": "active"},
-            {"$inc": {"score": 1}}
-        )
-    else:
-        sessions_collection.update_one(
-            {"chat_id": chat_id, "quiz_id": quiz_id, "status": "active"},
-            {"$push": {"unanswered": quiz["questions"][current_question]["question"]}}
-        )
-
-    send_question(chat_id, quiz_id, current_question + 1)
-
-def finish_quiz(chat_id):
-    """Finalize and show quiz results."""
-    session = sessions_collection.find_one({"chat_id": chat_id, "status": "active"})
-
-    if not session:
-        return
-
-    quiz_id = session["quiz_id"]
-    score = session["score"]
-    unanswered = session.get("unanswered", [])
-
-    bot.send_message(chat_id, f"Quiz completed! 🎉\nYour score: {score}")
-
-    leaderboard_collection.update_one(
-        {"quiz_id": quiz_id},
-        {"$push": {"scores": {"user_id": chat_id, "score": score}}},
-        upsert=True
-    )
-
-    show_leaderboard(chat_id, quiz_id)
-
-    if unanswered:
-        markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton("View Unanswered", callback_data=f"view_unanswered_{quiz_id}"))
-        bot.send_message(chat_id, "You left some questions unanswered. Click below to review them.", reply_markup=markup)
-
-    sessions_collection.delete_one({"chat_id": chat_id, "status": "active"})
-
-# Show leaderboard
-def show_leaderboard(chat_id, quiz_id):
-    leaderboard = leaderboard_collection.find_one({"quiz_id": quiz_id})
-    if not leaderboard or not leaderboard.get("scores"):
-        bot.send_message(chat_id, "No leaderboard data available.")
-        return
-
-    # Sort scores in descending order and handle ties
-    sorted_scores = sorted(leaderboard["scores"], key=lambda x: x["score"], reverse=True)
-    response = f"🏆 Leaderboard for Quiz {quiz_id}:\n\n"
-    rank = 1
-    previous_score = None
-
-    for i, entry in enumerate(sorted_scores):
-        # Assign rank only if the score is different from the previous score
-        if previous_score != entry["score"]:
-            rank = i + 1
-
-        user_id = entry["user_id"]
-        user_info = bot.get_chat(user_id)  # Fetch user details for a better display
-        user_name = user_info.username or user_info.first_name or "User"
-
-        response += f"{rank}. {user_name}: {entry['score']} points\n"
-        previous_score = entry["score"]
-
-    bot.send_message(chat_id, response)
-
-# Callback handler for viewing unanswered questions
-@bot.callback_query_handler(func=lambda call: call.data.startswith("view_unanswered_"))
-def view_unanswered_questions(call):
-    quiz_id = call.data.split("_", 2)[2]
-    session = sessions_collection.find_one({"chat_id": call.message.chat.id, "quiz_id": quiz_id, "status": "finished"})
-
-    if not session or not session.get("unanswered"):
-        bot.answer_callback_query(call.id, "No unanswered questions to display.")
-        return
-
-    unanswered = session["unanswered"]
-    response = "🔍 Unanswered Questions:\n\n" + "\n".join(unanswered)
-    bot.send_message(call.message.chat.id, response)
+    
+    try:
+        title, link = map(str.strip, text.split("-"))
+        if not link.startswith("https://"):
+            raise ValueError
+        quiz_data[title] = link
+        await update.message.reply_text(f"✅ Added: {title}")
+    except ValueError:
+        await update.message.reply_text("⚠️ Invalid format! Use: `Title - Link`")
 
 
-# Run the bot
-bot.infinity_polling()
+def generate_formatted_message():
+    header = "🔥 महिला सुपरवाइजर परीक्षा 2025 🔥\n📌 *अपनी तैयारी को अगले स्तर पर ले जाएं!*\n\n✦━━━━━━━━━━━━━━✦\n"
+    footer = "✦━━━━━━━━━━━━━━✦\n\n📍 किसी भी विषय पर क्लिक करें और सीधे टेस्ट पर जाएं! 🚀"
+    
+    body = "\n".join([f"📖 [✦ {title} ✦]({link}) 📖\n---------------------------------------------------------------------------------" for title, link in quiz_data.items()])
+    
+    return header + body + "\n\n" + footer
+
+
+def main():
+    app = Application.builder().token("8151017957:AAF15t0POw7oHaFjC-AySwvDmNyS3tZxbTI").build()
+    
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("generate_quiz_list", generate_quiz_list))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    
+    print("Bot is running...")
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
