@@ -5,11 +5,11 @@ from telegram.ext import Application, MessageHandler, filters, ContextTypes
 async def extract_quiz_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
-    # Extract all quiz titles and links
-    quiz_matches = re.findall(r"^(.*?)\s+by\s+@.*?\n.*?External sharing link:\n(t\.me/QuizBot\?start=\S+)", text, re.MULTILINE)
+    # ✅ Extract quiz title and link from forwarded message
+    quiz_matches = re.findall(r"^(.*?)\s+by\s+@.*?\s+Nobody answered.*?External sharing link:\s+(https://t\.me/QuizBot\?start=\S+)", text, re.MULTILINE | re.DOTALL)
     
     if not quiz_matches:
-        await update.message.reply_text("⚠ कोई वैध क्विज नहीं मिली!", parse_mode="Markdown")
+        await update.message.reply_text("⚠ कोई वैध क्विज नहीं मिली! कृपया सही फॉरवर्ड किया गया मैसेज भेजें।", parse_mode="Markdown")
         return
 
     # ✅ **Final Formatted Message**
@@ -19,7 +19,7 @@ async def extract_quiz_details(update: Update, context: ContextTypes.DEFAULT_TYP
 
     for title, quiz_link in quiz_matches:
         formatted_text += (
-            f"📖 ── *{title}* ── 📖\n"
+            f"📖 ── *{title.strip()}* ── 📖\n"
             f"📝 [Start Quiz]({quiz_link})\n"
             "----------------------------------\n"
         )
