@@ -1,37 +1,26 @@
 from telegram import Update
-from telegram.ext import Application, MessageHandler, CommandHandler, filters, ContextTypes
+from telegram.ext import Application, MessageHandler, filters, ContextTypes
 
-# ✅ Temporary storage to collect multiple quizzes
-user_quiz_data = {}
-
-async def collect_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.message.from_user.id
+async def extract_quiz_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
-    if user_id not in user_quiz_data:
-        user_quiz_data[user_id] = []
-
     lines = text.split("\n")
+    quizzes = []
     title = None
     link = None
 
     for line in lines:
-        if "by @" in line:
+        if "by @" in line:  
             title = line.split(" by @")[0].strip()  # Extract title
         elif "t.me/QuizBot?start=" in line:
             link = line.strip()  # Extract link
 
         if title and link:
-            user_quiz_data[user_id].append((title, link))
+            quizzes.append((title, link))
             title, link = None, None  # Reset for next quiz
 
-    await update.message.reply_text("✅ Quiz saved! Add more quizzes or send /done to finalize.")
-
-async def send_final_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.message.from_user.id
-
-    if user_id not in user_quiz_data or not user_quiz_data[user_id]:
-        await update.message.reply_text("⚠ कोई भी क्विज नहीं मिली! पहले क्विज फॉरवर्ड करें।", parse_mode="Markdown")
+    if not quizzes:
+        await update.message.reply_text("⚠ कोई वैध क्विज नहीं मिली! कृपया सही फॉरवर्ड किया गया मैसेज भेजें।", parse_mode="Markdown")
         return
 
     # ✅ **Final Formatted Message**
@@ -39,7 +28,7 @@ async def send_final_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
                      "📌 *अपनी तैयारी को अगले स्तर पर ले जाएं!*\n\n" \
                      "✦━━━━━━━━━━━━━━✦\n"
 
-    for title, quiz_link in user_quiz_data[user_id]:
+    for title, quiz_link in quizzes:
         formatted_text += (
             f"📖 ── *{title}* ── 📖\n"
             f"📝 [Start Quiz]({quiz_link})\n"
@@ -48,19 +37,11 @@ async def send_final_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     formatted_text += "📍 किसी भी विषय पर क्लिक करें और सीधे टेस्ट पर जाएं! 🚀"
 
-    # ✅ Send the final message
     await update.message.reply_text(formatted_text, parse_mode="Markdown", disable_web_page_preview=True)
-
-    # ✅ Clear user data after sending the message
-    user_quiz_data[user_id] = []
 
 def main():
     app = Application.builder().token("8151017957:AAF15t0POw7oHaFjC-AySwvDmNyS3tZxbTI").build()
-    
-    # ✅ Handlers
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, collect_quiz))
-    app.add_handler(CommandHandler("done", send_final_quiz))
-
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, extract_quiz_details))
     print("Bot is running...")
     app.run_polling()
 
