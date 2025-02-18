@@ -5,8 +5,11 @@ from telegram.ext import Application, MessageHandler, filters, ContextTypes
 async def extract_quiz_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
-    # ✅ Extract quiz title and link from forwarded message
-    quiz_matches = re.findall(r"^(.*?)\s+by\s+@.*?\s+Nobody answered.*?External sharing link:\s+(https://t\.me/QuizBot\?start=\S+)", text, re.MULTILINE | re.DOTALL)
+    # ✅ Extract quiz title and link using improved regex
+    quiz_matches = re.findall(
+        r"^(.*?)\s+by\s+@.*?\n.*?External sharing link:\s*(https://t\.me/QuizBot\?start=\S+)", 
+        text, re.MULTILINE | re.DOTALL
+    )
     
     if not quiz_matches:
         await update.message.reply_text("⚠ कोई वैध क्विज नहीं मिली! कृपया सही फॉरवर्ड किया गया मैसेज भेजें।", parse_mode="Markdown")
@@ -29,7 +32,7 @@ async def extract_quiz_details(update: Update, context: ContextTypes.DEFAULT_TYP
     await update.message.reply_text(formatted_text, parse_mode="Markdown", disable_web_page_preview=True)
 
 def main():
-    app = Application.builder().token("8151017957:AAF15t0POw7oHaFjC-AySwvDmNyS3tZxbTI").build()
+    app = Application.builder().token("YOUR_BOT_TOKEN").build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, extract_quiz_details))
     print("Bot is running...")
     app.run_polling()
