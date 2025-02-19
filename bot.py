@@ -42,8 +42,10 @@ async def send_final_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for title, quiz_link in user_quiz_data[user_id]:
         formatted_text += (
             f"📖 ── *{title}* ── 📖\n"
+            "----------------------------------\n"
             f"📝 [Start Quiz]({quiz_link})\n"
             "----------------------------------\n"
+            "➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖\n"
         )
 
     formatted_text += "📍 किसी भी विषय पर क्लिक करें और सीधे टेस्ट पर जाएं! 🚀"
