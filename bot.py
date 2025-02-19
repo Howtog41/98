@@ -1,16 +1,20 @@
 from telegram import Update
 from telegram.ext import Application, MessageHandler, CommandHandler, filters, ContextTypes, ConversationHandler
 
-# ✅ Storage for multiple quizzes
+# ✅ Store user data
 user_quiz_data = {}
-WAITING_FOR_TITLE = 1  # State for waiting for title
+WAITING_FOR_TITLE = 1  # State to wait for title input
 
 async def collect_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     text = update.message.text
 
     if user_id not in user_quiz_data:
-        user_quiz_data[user_id] = {"quizzes": [], "title": None}
+        user_quiz_data[user_id] = {"quizzes": [], "waiting_for_title": False}
+
+    if user_quiz_data[user_id]["waiting_for_title"]:
+        await update.message.reply_text("⚠ पहले /done भेजें ताकि टाइटल माँगा जा सके।")
+        return
 
     lines = text.split("\n")
     title = None
@@ -35,6 +39,7 @@ async def ask_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠ कोई भी क्विज नहीं मिली! पहले क्विज फॉरवर्ड करें।")
         return ConversationHandler.END
 
+    user_quiz_data[user_id]["waiting_for_title"] = True  # Mark waiting state
     await update.message.reply_text("📌 कृपया अपना टाइटल दर्ज करें:")
     return WAITING_FOR_TITLE
 
@@ -46,7 +51,12 @@ async def send_final_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠ टाइटल खाली नहीं हो सकता! कृपया एक वैध टाइटल भेजें।")
         return WAITING_FOR_TITLE  # Again wait for title
 
-    user_quiz_data[user_id]["title"] = title
+    if user_id not in user_quiz_data or not user_quiz_data[user_id]["quizzes"]:
+        await update.message.reply_text("⚠ कोई भी क्विज नहीं मिली! पहले क्विज फॉरवर्ड करें।")
+        return ConversationHandler.END
+
+    user_quiz_data[user_id]["waiting_for_title"] = False  # Reset waiting state
+
     quizzes = user_quiz_data[user_id]["quizzes"]
 
     formatted_text = f"🔥 *{title}* 🔥\n📌 *अपनी तैयारी को अगले स्तर पर ले जाएं!*\n\n" \
