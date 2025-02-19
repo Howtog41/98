@@ -3,7 +3,7 @@ from telegram.ext import Application, MessageHandler, CommandHandler, filters, C
 
 # ✅ Temporary storage to collect multiple quizzes
 user_quiz_data = {}
-
+WAITING_FOR_TITLE = 1
 async def collect_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     text = update.message.text
@@ -26,13 +26,27 @@ async def collect_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
             title, link = None, None  # Reset for next quiz
 
     await update.message.reply_text("✅ Quiz saved! Add more quizzes or send /done to finalize.")
-
-async def send_final_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    return WAITING_FOR_TITLE
+    
+async def ask_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
 
-    if user_id not in user_quiz_data or not user_quiz_data[user_id]:
-        await update.message.reply_text("⚠ कोई भी क्विज नहीं मिली! पहले क्विज फॉरवर्ड करें।", parse_mode="Markdown")
-        return
+    if user_id not in user_quiz_data or not user_quiz_data[user_id]["quizzes"]:
+        await update.message.reply_text("⚠ कोई भी क्विज नहीं मिली! पहले क्विज फॉरवर्ड करें।")
+        return ConversationHandler.END
+
+    await update.message.reply_text("📌 कृपया अपना कस्टम टाइटल दर्ज करें:")
+    return WAITING_FOR_TITLE
+    
+async def send_final_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+    title = update.message.text.strip()
+    if not title:
+        await update.message.reply_text("⚠ टाइटल खाली नहीं हो सकता! कृपया एक वैध टाइटल भेजें।")
+        return WAITING_FOR_TITLE
+
+    user_quiz_data[user_id]["title"] = title
+    quizzes = user_quiz_data[user_id]["quizzes"]
 
     # ✅ **Final Formatted Message**
     formatted_text = "🔥 *महिला सुपरवाइजर परीक्षा 2025* 🔥\n" \
@@ -56,7 +70,10 @@ async def send_final_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     app = Application.builder().token("8151017957:AAF15t0POw7oHaFjC-AySwvDmNyS3tZxbTI").build()
-    
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("done", ask_title)],
+        states={WAITING_FOR_TITLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, send_final_quiz)]},
+       
     # ✅ Handlers
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, collect_quiz))
     app.add_handler(CommandHandler("done", send_final_quiz))
