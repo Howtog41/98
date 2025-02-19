@@ -17,7 +17,7 @@ async def collect_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     for line in lines:
         if "by @" in line:
-            title = line.split(" by @")[0].strip()  # Extract title
+            title = line.split(" @")[0].strip()  # Extract title
         elif "t.me/QuizBot?start=" in line:
             link = line.strip()  # Extract link
 
