@@ -13,7 +13,7 @@ async def collect_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_quiz_data[user_id] = {"quizzes": [], "waiting_for_title": False}
 
     if user_quiz_data[user_id]["waiting_for_title"]:
-        await update.message.reply_text("⚠ पहले /done भेजें ताकि टाइटल माँगा जा सके।")
+        await update.message.reply_text("⚠ पहले टाइटल भेजें, फिर नया क्विज ऐड करें!")
         return
 
     lines = text.split("\n")
@@ -37,7 +37,7 @@ async def ask_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if user_id not in user_quiz_data or not user_quiz_data[user_id]["quizzes"]:
         await update.message.reply_text("⚠ कोई भी क्विज नहीं मिली! पहले क्विज फॉरवर्ड करें।")
-        return ConversationHandler.END
+        return
 
     user_quiz_data[user_id]["waiting_for_title"] = True  # Mark waiting state
     await update.message.reply_text("📌 कृपया अपना टाइटल दर्ज करें:")
@@ -45,21 +45,17 @@ async def ask_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def send_final_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
-    title = update.message.text.strip()
+    text = update.message.text.strip()
 
-    if not title:
-        await update.message.reply_text("⚠ टाइटल खाली नहीं हो सकता! कृपया एक वैध टाइटल भेजें।")
-        return WAITING_FOR_TITLE  # Again wait for title
-
-    if user_id not in user_quiz_data or not user_quiz_data[user_id]["quizzes"]:
-        await update.message.reply_text("⚠ कोई भी क्विज नहीं मिली! पहले क्विज फॉरवर्ड करें।")
-        return ConversationHandler.END
+    if user_id not in user_quiz_data or not user_quiz_data[user_id]["waiting_for_title"]:
+        await update.message.reply_text("⚠ पहले /done भेजें ताकि टाइटल माँगा जा सके।")
+        return
 
     user_quiz_data[user_id]["waiting_for_title"] = False  # Reset waiting state
 
     quizzes = user_quiz_data[user_id]["quizzes"]
 
-    formatted_text = f"🔥 *{title}* 🔥\n📌 *अपनी तैयारी को अगले स्तर पर ले जाएं!*\n\n" \
+    formatted_text = f"🔥 *{text}* 🔥\n📌 *अपनी तैयारी को अगले स्तर पर ले जाएं!*\n\n" \
                      "✦━━━━━━━━━━━━━━✦\n"
 
     for quiz_title, quiz_link in quizzes:
