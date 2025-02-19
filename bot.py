@@ -35,7 +35,7 @@ async def ask_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠ कोई भी क्विज नहीं मिली! पहले क्विज फॉरवर्ड करें।")
         return ConversationHandler.END
 
-    await update.message.reply_text("📌 कृपया अपना कस्टम टाइटल दर्ज करें:")
+    await update.message.reply_text("📌 कृपया अपना टाइटल दर्ज करें:")
     return WAITING_FOR_TITLE
 
 async def send_final_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -44,7 +44,7 @@ async def send_final_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not title:
         await update.message.reply_text("⚠ टाइटल खाली नहीं हो सकता! कृपया एक वैध टाइटल भेजें।")
-        return WAITING_FOR_TITLE
+        return WAITING_FOR_TITLE  # Again wait for title
 
     user_quiz_data[user_id]["title"] = title
     quizzes = user_quiz_data[user_id]["quizzes"]
@@ -63,12 +63,12 @@ async def send_final_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(formatted_text, parse_mode="Markdown", disable_web_page_preview=True)
 
-    # ✅ Clear user data
-    user_quiz_data[user_id] = {}
+    # ✅ Clear user data after sending final message
+    user_quiz_data.pop(user_id, None)
     return ConversationHandler.END
 
 def main():
-    app = Application.builder().token("8151017957:AAF15t0POw7oHaFjC-AySwvDmNyS3tZxbTI").build()
+    app = Application.builder().token("YOUR_BOT_TOKEN").build()
 
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("done", ask_title)],
