@@ -329,7 +329,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
         else:
             finalize_quiz(bot, quiz_data["chat_id"])
 
-    def start_group_quiz(bot: Bot, chat_id: int, quiz_id: str):
+    def start_group_quiz(bot: bot, chat_id: int, quiz_id: str):
         """Starts the quiz in a group and sends the first question."""
         if quiz_id not in saved_quizzes:
             bot.send_message(chat_id, "Quiz not found. Please check the quiz ID.")
