@@ -385,7 +385,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             type="quiz",
             correct_option_id=question["correct_option_id"],
             explanation=question["explanation"],
-            is_anonymous=False # Ensure this is not passed twice
+            is_anonymous=False, # Ensure this is not passed twice
             open_period=40
         )
 
