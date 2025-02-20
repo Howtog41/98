@@ -349,36 +349,41 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
         # Start first question
         send_next_question(bot, chat_id)
 
-    def send_next_question(bot, chat_id):
+    def send_next_question(bot, chat_id, quiz_id, question_index):
         """Send the next question with a 40-second timer."""
-        if chat_id not in active_quizzes:
-            bot.send_message(chat_id, "⚠️ No active quiz found.")
-            return
-
-        quiz_id = active_quizzes[chat_id]["quiz_id"]
-        index = active_quizzes[chat_id]["current_index"]
         quiz = saved_quizzes.get(quiz_id)
-
-
-        
+        if not quiz:
+            bot.send_message(chat_id, "Quiz not found.")
+            return
 
         questions = quiz["questions"]
-
-        if index >= len(questions):
-            finalize_quiz(bot, chat_id)  # Quiz end logic
+        total_questions = len(questions) 
+        if question_index >= len(questions):
+            show_leaderboard(bot, chat_id)
             return
 
-        question = questions[index]
+               question = questions[question_index]
+        pre_poll_message = question.get("pre_poll_message")
+        if pre_poll_message:
+            if pre_poll_message["type"] == "text":
+                bot.send_message(chat_id, pre_poll_message["content"])
+            elif pre_poll_message["type"] == "photo":
+                bot.send_photo(chat_id, pre_poll_message["content"])
+            elif pre_poll_message["type"] == "video":
+                bot.send_video(chat_id, pre_poll_message["content"])
 
-        # Send question
+        # Add numbering to the question
+        numbered_question = f"Q{question_index + 1}/{total_questions}: {question['question']}"
+    
+        
         bot.send_poll(
             chat_id=chat_id,
-            question=f"Q{index + 1}/{len(questions)}: {question['question']}",
+            question=numbered_question,
             options=question["options"],
             type="quiz",
             correct_option_id=question["correct_option_id"],
-            explanation=question.get("explanation", ""),
-            is_anonymous=False
+            explanation=question["explanation"],
+            is_anonymous=False  # Ensure this is not passed twice
         )
 
         # Increment question index
@@ -386,6 +391,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
 
         # Schedule next question after 40 seconds
         threading.Timer(40, send_next_question, args=[bot, chat_id]).start()
+        
     def question_timer(bot, chat_id, index, message_id, correct_answer):
         """Handle 40-second timer for each MCQ."""
         time.sleep(40)
