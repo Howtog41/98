@@ -347,7 +347,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
         }
 
         # Start first question
-        send_next_question(bot, chat_id)
+        send_next_question(bot, chat_id, quiz_id, question_index)
 
     def send_next_question(bot, chat_id, quiz_id, question_index):
         """Send the next question with a 40-second timer."""
