@@ -352,30 +352,40 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
     def send_next_question(bot, chat_id):
         """Send the next question with a 40-second timer."""
         if chat_id not in active_quizzes:
+            bot.send_message(chat_id, "⚠️ No active quiz found.")
             return
 
-        quiz_data = active_quizzes[chat_id]
-        questions = quiz_data["questions"]
-        index = quiz_data["current_question"]
+        quiz_id = active_quizzes[chat_id]["quiz_id"]
+        index = active_quizzes[chat_id]["current_index"
+        quiz = saved_quizzes.get(quiz_id)
+
+
+        
+
+        questions = quiz["questions"]
 
         if index >= len(questions):
-            show_leaderboard(bot, chat_id)  # Show leaderboard if quiz ends
+            finalize_quiz(bot, chat_id)  # Quiz end logic
             return
 
-        question_data = questions[index]
-        question_text = question_data["question"]
-        options = question_data["options"]
-        correct_answer = question_data["correct_answer"]
+        question = questions[index]
 
-        markup = InlineKeyboardMarkup()
-        for i, option in enumerate(options):
-            markup.add(InlineKeyboardButton(option, callback_data=f"answer_{chat_id}_{index}_{i}"))
+        # Send question
+        bot.send_poll(
+            chat_id=chat_id,
+            question=f"Q{index + 1}/{len(questions)}: {question['question']}",
+            options=question["options"],
+            type="quiz",
+            correct_option_id=question["correct_option_id"],
+            explanation=question.get("explanation", ""),
+            is_anonymous=False
+        )
 
-        msg = bot.send_message(chat_id, f"**Q{index+1}:** {question_text}", reply_markup=markup)
+        # Increment question index
+        active_quizzes[chat_id]["current_index"] += 1
 
-        # Start 40-second timer for the question
-        threading.Thread(target=question_timer, args=(bot, chat_id, index, msg.message_id, correct_answer)).start()
-
+        # Schedule next question after 40 seconds
+        threading.Timer(40, send_next_question, args=[bot, chat_id]).start()
     def question_timer(bot, chat_id, index, message_id, correct_answer):
         """Handle 40-second timer for each MCQ."""
         time.sleep(40)
