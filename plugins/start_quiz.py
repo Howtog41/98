@@ -346,6 +346,8 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             "participants": set(),  # Unique participants
         }
 
+        question_index = 0  
+
         # Start first question
         send_next_question(bot, chat_id, quiz_id, question_index)
 
