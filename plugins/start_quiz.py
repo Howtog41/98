@@ -362,7 +362,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             show_leaderboard(bot, chat_id)
             return
 
-               question = questions[question_index]
+        question = questions[question_index]
         pre_poll_message = question.get("pre_poll_message")
         if pre_poll_message:
             if pre_poll_message["type"] == "text":
