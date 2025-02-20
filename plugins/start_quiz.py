@@ -341,7 +341,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
         active_quizzes[chat_id] = {
             "quiz_id": quiz_id,
             "questions": saved_quizzes[quiz_id],  # Load questions
-            "current_question": 0,
+            "current_index": 0,
             "responses": {},  # Track user responses
             "participants": set(),  # Unique participants
         }
