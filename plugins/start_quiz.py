@@ -356,7 +356,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             return
 
         quiz_id = active_quizzes[chat_id]["quiz_id"]
-        index = active_quizzes[chat_id]["current_index"
+        index = active_quizzes[chat_id]["current_index"]
         quiz = saved_quizzes.get(quiz_id)
 
 
