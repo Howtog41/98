@@ -392,24 +392,25 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
         # Update active quiz index
         active_quizzes[chat_id]["current_index"] = question_index
 
-        # Schedule next question after 40 seconds
-        threading.Timer(5, send_next_question, args=[bot, chat_id, quiz_id, question_index + 1]).start()
+       
 
-        
-    def question_timer(bot, chat_id, index, message_id, correct_answer):
-        """Handle 40-second timer for each MCQ."""
-        time.sleep(5)
-
-        if chat_id not in active_quizzes:
+    @bot.poll_handler()
+    def handle_poll_results(bot, poll):
+        """Handle poll results and send the next question automatically."""
+        chat_id = active_poll_chats.get(poll.id)
+        if not chat_id or chat_id not in active_quizzes:
             return
 
         quiz_data = active_quizzes[chat_id]
-        if quiz_data["current_question"] != index:
-            return  # Ensure correct question is processed
+        current_index = quiz_data["current_index"]
 
-        bot.edit_message_text(f"⏳ Time's up for Q{index+1}!", chat_id, message_id)
-        quiz_data["current_question"] += 1
-        send_next_question(bot, chat_id)
+        # If more questions are left, send the next one
+        if current_index + 1 < len(quiz_data["questions"]):
+            send_next_question(bot, chat_id, quiz_data["quiz_id"], current_index + 1)
+        else:
+            show_leaderboard(bot, chat_id)
+
+   
 
     @bot.callback_query_handler(func=lambda call: call.data.startswith("answer_"))
     def handle_answer(bot, call):
