@@ -14,12 +14,18 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
     def start_handler(message):
         """Handle the /start command with quiz ID."""
         chat_id = message.chat.id
+        chat_type = message.chat.type  # Check if it's private or a group
 
         if len(message.text.split()) > 1:
             param = message.text.split()[1]
             if param.startswith("quiz_"):
                 quiz_id = param.split("_", 1)[1]
-                ask_user_ready(bot, chat_id, quiz_id)
+                if chat_type == "private":
+                    # If it's a personal chat, ask user if they are ready
+                    ask_user_ready(bot, chat_id, quiz_id)
+                else:
+                    # If it's a group chat, start group quiz handler
+                    start_group_quiz(bot, chat_id, quiz_id)
             else:
                 bot.send_message(chat_id, "Invalid parameter. Please check the link.")
         else:
@@ -322,3 +328,109 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             send_question(bot, quiz_data["chat_id"], quiz_id, next_question_index)
         else:
             finalize_quiz(bot, quiz_data["chat_id"])
+
+
+    def start_group_quiz(bot, chat_id, quiz_id):
+        """Start the quiz in a group with a 40-second timer for each question."""
+        if quiz_id not in saved_quizzes:
+            bot.send_message(chat_id, "Quiz not found. Please check the quiz ID.")
+            return
+    
+        bot.send_message(chat_id, f"🎉 Group Quiz Started! 🎉\nQuiz ID: {quiz_id}\nEach question has **40 seconds** to answer.")
+    
+        active_quizzes[chat_id] = {
+            "quiz_id": quiz_id,
+            "questions": saved_quizzes[quiz_id],  # Load questions
+            "current_question": 0,
+            "responses": {},  # Track user responses
+            "participants": set(),  # Unique participants
+        }
+
+        # Start first question
+        send_next_question(bot, chat_id)
+
+    def send_next_question(bot, chat_id):
+        """Send the next question with a 40-second timer."""
+        if chat_id not in active_quizzes:
+            return
+
+        quiz_data = active_quizzes[chat_id]
+        questions = quiz_data["questions"]
+        index = quiz_data["current_question"]
+
+        if index >= len(questions):
+            show_leaderboard(bot, chat_id)  # Show leaderboard if quiz ends
+            return
+
+        question_data = questions[index]
+        question_text = question_data["question"]
+        options = question_data["options"]
+        correct_answer = question_data["correct_answer"]
+
+        markup = InlineKeyboardMarkup()
+        for i, option in enumerate(options):
+            markup.add(InlineKeyboardButton(option, callback_data=f"answer_{chat_id}_{index}_{i}"))
+
+        msg = bot.send_message(chat_id, f"**Q{index+1}:** {question_text}", reply_markup=markup)
+
+        # Start 40-second timer for the question
+        threading.Thread(target=question_timer, args=(bot, chat_id, index, msg.message_id, correct_answer)).start()
+
+    def question_timer(bot, chat_id, index, message_id, correct_answer):
+        """Handle 40-second timer for each MCQ."""
+        time.sleep(40)
+
+        if chat_id not in active_quizzes:
+            return
+
+        quiz_data = active_quizzes[chat_id]
+        if quiz_data["current_question"] != index:
+            return  # Ensure correct question is processed
+
+        bot.edit_message_text(f"⏳ Time's up for Q{index+1}!", chat_id, message_id)
+        quiz_data["current_question"] += 1
+        send_next_question(bot, chat_id)
+
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("answer_"))
+    def handle_answer(bot, call):
+        """Handle user answers in group quiz."""
+        data = call.data.split("_")
+        chat_id = int(data[1])
+        question_index = int(data[2])
+        selected_option = int(data[3])
+        user_id = call.from_user.id
+
+        if chat_id not in active_quizzes:
+            return
+
+        quiz_data = active_quizzes[chat_id]
+        correct_answer = quiz_data["questions"][question_index]["correct_answer"]
+
+        # Track user's first response only
+        if user_id not in quiz_data["responses"]:
+            quiz_data["responses"][user_id] = 0  # Initialize user score
+
+        if user_id not in quiz_data["participants"]:
+            quiz_data["participants"].add(user_id)  # Add user to participants
+
+        if selected_option == correct_answer:
+            quiz_data["responses"][user_id] += 1  # Increase score for correct answer
+
+        bot.answer_callback_query(call.id, "Answer recorded!")  # Confirm answer selection
+
+    def show_leaderboard(bot, chat_id):
+        """Display leaderboard at the end of the quiz."""
+        if chat_id not in active_quizzes:
+            return
+
+        quiz_data = active_quizzes[chat_id]
+        scores = quiz_data["responses"]
+
+        sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    
+        leaderboard_text = "🏆 **Final Leaderboard** 🏆\n"
+        for i, (user_id, score) in enumerate(sorted_scores, start=1):
+            leaderboard_text += f"{i}. [User {user_id}](tg://user?id={user_id}) - {score} points\n"
+
+        bot.send_message(chat_id, leaderboard_text, parse_mode="Markdown")
+        del active_quizzes[chat_id]  # Cleanup after quiz ends
