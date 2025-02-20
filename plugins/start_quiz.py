@@ -386,7 +386,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             correct_option_id=question["correct_option_id"],
             explanation=question["explanation"],
             is_anonymous=False # Ensure this is not passed twice
-            **open_period=40**
+            open_period=40
         )
 
         # Update active quiz index
