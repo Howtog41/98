@@ -388,11 +388,12 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
             is_anonymous=False  # Ensure this is not passed twice
         )
 
-        # Increment question index
-        active_quizzes[chat_id]["current_index"] += 1
+        # Update active quiz index
+        active_quizzes[chat_id]["current_index"] = question_index
 
         # Schedule next question after 40 seconds
-        threading.Timer(40, send_next_question, args=[bot, chat_id]).start()
+        threading.Timer(40, send_next_question, args=[bot, chat_id, quiz_id, question_index + 1]).start()
+
         
     def question_timer(bot, chat_id, index, message_id, correct_answer):
         """Handle 40-second timer for each MCQ."""
