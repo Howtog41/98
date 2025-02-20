@@ -395,7 +395,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
        
 
     @bot.poll_handler()
-    def handle_poll_results(bot, poll):
+    def handle_poll_results(poll):
         """Handle poll results and send the next question automatically."""
         chat_id = active_poll_chats.get(poll.id)
         if not chat_id or chat_id not in active_quizzes:
