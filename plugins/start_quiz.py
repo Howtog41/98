@@ -347,7 +347,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
     
         send_next_question(bot, chat_id)
 
-    def send_next_question(bot: Bot, chat_id: int):
+    def send_next_question(bot: bot, chat_id: int):
         """Sends the next question automatically after the previous question's time ends."""
         if chat_id not in active_quizzes:
             return
@@ -376,7 +376,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
         # Move to next question
         active_quizzes[chat_id]["current_index"] += 1
 
-    def handle_answer(bot: Bot, update: Update, context: CallbackContext):
+    def handle_answer(bot: bot, update: Update, context: CallbackContext):
         """Handles user responses but does not reveal correctness immediately in group mode."""
         query = update.callback_query
         user_id = query.from_user.id
@@ -401,7 +401,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
     
         bot.answer_callback_query(query.id, "Answer recorded!")
 
-    def show_leaderboard(bot: Bot, chat_id: int):
+    def show_leaderboard(bot: bot, chat_id: int):
         """Displays the final leaderboard at the end of the quiz."""
         if chat_id not in active_quizzes:
             return
