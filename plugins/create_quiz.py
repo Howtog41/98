@@ -79,6 +79,7 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
 
         poll = message.poll
         pre_poll_message = creating_quizzes[chat_id]["current_pre_poll_message"]
+        bot.send_message(chat_id, "Enter the open period (in seconds) for this question:")
 
         # Add the poll with its pre-poll message
         creating_quizzes[chat_id]["questions"].append({
@@ -105,25 +106,28 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
         if chat_id not in creating_quizzes or not creating_quizzes[chat_id]["active"] or not creating_quizzes[chat_id]["questions"]:
             bot.send_message(chat_id, "No questions added. Use /create_quiz to start again.")
             return
+        if not creating_quizzes[chat_id]["questions"]:
+            bot.send_message(chat_id, "No questions added. Please forward polls before finalizing.")
+            return
+        
+        bot.send_message(chat_id, "Enter the open period (in seconds) that will apply to all questions:", reply_markup=ForceReply())
 
-        # Mark the quiz creation process as inactive
-        creating_quizzes[chat_id]["active"] = False
 
-
-
-        bot.send_message(chat_id, "Quiz creation complete! 🎉\nNow, send the quiz duration in seconds (e.g., 120 for 2 minutes).")
-
+    
     @bot.message_handler(func=lambda message: message.chat.id in creating_quizzes and not creating_quizzes[message.chat.id]["active"] and creating_quizzes[message.chat.id]["timer"] is None)
     def set_quiz_timer(message):
         """Set the timer for the quiz."""
         chat_id = message.chat.id
         try:
-            timer = int(message.text)
-            if timer <= 0:
+            open_period = int(message.text)
+            if open_period <= 0:
                 raise ValueError
-            creating_quizzes[chat_id]["timer"] = timer
-            quiz_id = generate_quiz_id()
 
+            # Apply open period to all questions
+            for question in creating_quizzes[chat_id]["questions"]:
+                question["open_period"] = open_period  
+
+            quiz_id = generate_quiz_id()
             quiz_data = creating_quizzes.pop(chat_id)
             quiz_data["quiz_id"] = quiz_id  
             quiz_data["participants"] = 0  # Initialize participants count
