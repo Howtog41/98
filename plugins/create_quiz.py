@@ -1,5 +1,6 @@
 import random
 import string
+from telebot.types import ForceReply
 
 def generate_quiz_id():
     """Generate a unique quiz ID."""
@@ -106,11 +107,10 @@ def register_handlers(bot, saved_quizzes, creating_quizzes, save_quiz_to_db, qui
         if chat_id not in creating_quizzes or not creating_quizzes[chat_id]["active"] or not creating_quizzes[chat_id]["questions"]:
             bot.send_message(chat_id, "No questions added. Use /create_quiz to start again.")
             return
-        if not creating_quizzes[chat_id]["questions"]:
-            bot.send_message(chat_id, "No questions added. Please forward polls before finalizing.")
-            return
+        
         
         bot.send_message(chat_id, "Enter the open period (in seconds) that will apply to all questions:", reply_markup=ForceReply())
+        creating_quizzes[chat_id]["waiting_for_timer"] = True  # Track the waiting state
 
 
     
