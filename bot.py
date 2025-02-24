@@ -62,8 +62,8 @@ def start_quiz(message):
     
     # Extract Telegram Name
     user_name = message.from_user.first_name
-    custom_form_link = f"{form_link}&entry.YOUR_FIELD_ID={user_name}"  # Replace YOUR_FIELD_ID with actual field ID
-    
+    custom_form_link = form_link.replace("YourName", user_name)  # ✅ FIXED
+
     bot.send_message(chat_id, f"🎯 Click the link below to start the quiz:\n🔗 {custom_form_link}")
 
 ### 🟢 3️⃣ Command: Get Leaderboard (/leaderboard)
