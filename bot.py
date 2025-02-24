@@ -93,6 +93,11 @@ def start_quiz_from_link(message):
     )
 
 
+import requests
+import csv
+import io
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+
 @bot.callback_query_handler(func=lambda call: call.data.startswith("rank_"))
 def show_rank(call):
     chat_id = call.message.chat.id
@@ -115,7 +120,9 @@ def show_rank(call):
         csv_reader = csv.reader(io.StringIO(data))
         rows = list(csv_reader)
 
-        
+        # 🔍 Debugging Print
+        print("CSV Data:", rows)
+
         if len(rows) < 2:
             bot.send_message(chat_id, "❌ No quiz data found in the sheet!")
             return
@@ -147,10 +154,12 @@ def show_rank(call):
                 if student_id not in valid_records:
                     valid_records[student_id] = score
 
-           except (ValueError, IndexError) as e:
+            except (ValueError, IndexError) as e:
                 print(f"Skipping invalid row: {row} | Error: {e}")  # 🔍 Debugging
-                
-        
+
+        # 🔍 Debugging Print
+        print("Valid Records (First Attempt Only):", valid_records)
+
         if not valid_records:
             bot.send_message(chat_id, "❌ No valid scores found in the sheet! Check format.")
             return
@@ -182,5 +191,6 @@ def show_rank(call):
 
     except Exception as e:
         bot.send_message(chat_id, f"❌ Error fetching leaderboard: {e}")
+
 ### ✅ Bot Start
 bot.polling(none_stop=True)
