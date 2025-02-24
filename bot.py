@@ -216,7 +216,7 @@ def show_rank(call):
             try:
                 user_info = bot.get_chat(uid)
                 if user_info.username:
-                    user_name = f"@{user_info.username}"  # ✅ Username show karega agar available hai
+                    user_name = f"@{escape_markdown(user_info.username)}"  # ✅ Username show karega agar available hai
                 else:
                     # ✅ Agar username nahi mila to First Name aur Last Name concatenate karein
                     full_name = f"{user_info.first_name or ''} {user_info.last_name or ''}".strip()
@@ -227,7 +227,7 @@ def show_rank(call):
 
         for idx, (uid, score) in enumerate(top_players, 1):
             rank_text += f"{idx}. {usernames.get(uid, 'Unknown')} - {score} pts\n"
-        bot.send_message(chat_id, rank_text, parse_mode="Markdown")
+        bot.send_message(chat_id, rank_text, parse_mode="MarkdownV2")
 
     except Exception as e:
         bot.send_message(chat_id, f"❌ Error fetching leaderboard: {e}")
