@@ -127,7 +127,7 @@ def show_rank(call):
 
         for row in rows[1:]:
             try:
-                student_id = int(row[0].strip())  # ✅ Column A (1st Column) → User ID
+                student_id = int(row[3].strip())  # ✅ Column A (1st Column) → User ID
                 score_parts = row[1].split("/")  # ✅ "X / Y" Format
                 score = int(score_parts[0].strip())  # ✅ Extract Score
                 total = int(score_parts[1].strip())  # ✅ Extract Total Marks
