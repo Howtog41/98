@@ -93,10 +93,6 @@ def start_quiz_from_link(message):
     )
 
 
-import requests
-import csv
-import io
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("rank_"))
 def show_rank(call):
@@ -120,9 +116,6 @@ def show_rank(call):
         csv_reader = csv.reader(io.StringIO(data))
         rows = list(csv_reader)
 
-        # 🔍 Debugging Print
-        print("CSV Data:", rows)
-
         if len(rows) < 2:
             bot.send_message(chat_id, "❌ No quiz data found in the sheet!")
             return
@@ -132,6 +125,7 @@ def show_rank(call):
         total_marks = None
         user_score = None
         user_rank = None
+        user_attempted = False  # ✅ Track if user attempted test
 
         for row in rows[1:]:  # Skip Header
             try:
@@ -154,11 +148,12 @@ def show_rank(call):
                 if student_id not in valid_records:
                     valid_records[student_id] = score
 
+                # ✅ Track if user attempted test
+                if student_id == user_id:
+                    user_attempted = True
+
             except (ValueError, IndexError) as e:
                 print(f"Skipping invalid row: {row} | Error: {e}")  # 🔍 Debugging
-
-        # 🔍 Debugging Print
-        print("Valid Records (First Attempt Only):", valid_records)
 
         if not valid_records:
             bot.send_message(chat_id, "❌ No valid scores found in the sheet! Check format.")
@@ -172,6 +167,11 @@ def show_rank(call):
             if uid == user_id:
                 user_rank = idx
                 user_score = score
+
+        # ✅ If user did not attempt the test
+        if not user_attempted:
+            bot.send_message(chat_id, "❌ Aapne yeh test attend nahi kiya hai ya aapne apne predefined roll number ko badal diya hai!")
+            return
 
         # ✅ Display User Rank & Top 5 Leaderboard
         rank_text = f"📌 *Your Rank:* {user_rank}/{len(sorted_records)}\n📊 *Your Score:* {user_score}/{total_marks}\n\n"
@@ -191,6 +191,7 @@ def show_rank(call):
 
     except Exception as e:
         bot.send_message(chat_id, f"❌ Error fetching leaderboard: {e}")
+
 
 ### ✅ Bot Start
 bot.polling(none_stop=True)
