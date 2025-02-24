@@ -74,9 +74,9 @@ def start_quiz_from_link(message):
     quiz_title = QUIZ_DB[quiz_id]["title"]
     form_link = QUIZ_DB[quiz_id]["form"]
 
-    # ✅ Extract Telegram Name & Generate Prefilled Link
-    user_name = message.from_user.first_name or "User"
-    custom_form_link = form_link.replace("YourName", user_name)  
+    # ✅ Extract Telegram User ID & Generate Prefilled Link
+    user_id = str(message.from_user.id)  # Convert to string for URL
+    custom_form_link = form_link.replace("YourName", user_id)  
 
     # ✅ Inline Keyboard for Start Test & Your Rank
     markup = InlineKeyboardMarkup()
@@ -91,11 +91,13 @@ def start_quiz_from_link(message):
         parse_mode="Markdown",
         reply_markup=markup
     )
-### 🟢 3️⃣ Handle "Your Rank" Button Click
+
+
 @bot.callback_query_handler(func=lambda call: call.data.startswith("rank_"))
 def show_rank(call):
     chat_id = call.message.chat.id
     quiz_id = call.data.replace("rank_", "")
+    user_id = call.from_user.id  # ✅ Store User ID
 
     if quiz_id not in QUIZ_DB:
         bot.answer_callback_query(call.id, "❌ Quiz not found!", show_alert=True)
@@ -109,9 +111,9 @@ def show_rank(call):
         response.raise_for_status()
         data = response.text
 
-        # Parse CSV Data
+        # ✅ Parse CSV Data
         csv_reader = csv.reader(io.StringIO(data))
-        rows = list(csv_reader)  # Convert to List
+        rows = list(csv_reader)
 
         if len(rows) < 2:
             bot.send_message(chat_id, "❌ No quiz data found in the sheet!")
@@ -119,25 +121,24 @@ def show_rank(call):
 
         leaderboard_text = "🏆 *Quiz Leaderboard:*\n\n"
         valid_records = []
-        total_marks = None  # ✅ Store Total Marks
+        total_marks = None
         user_score = None
         user_rank = None
-        user_name = call.from_user.first_name
 
         for row in rows[1:]:
             try:
-                student_name = row[2].strip()  # ✅ Column C (3rd Column) se Name Extract
-                score_parts = row[1].split("/")  # ✅ Split "X / Y" Format
-                score = int(score_parts[0].strip())  # ✅ Extract Score (X)
-                total = int(score_parts[1].strip())  # ✅ Extract Total Marks (Y)
+                student_id = int(row[0].strip())  # ✅ Column A (1st Column) → User ID
+                score_parts = row[1].split("/")  # ✅ "X / Y" Format
+                score = int(score_parts[0].strip())  # ✅ Extract Score
+                total = int(score_parts[1].strip())  # ✅ Extract Total Marks
 
                 if total_marks is None:
-                    total_marks = total  # ✅ Set Total Marks (first occurrence)
+                    total_marks = total  # ✅ Set Total Marks
 
-                valid_records.append({"Name": student_name, "Score": score})
+                valid_records.append({"ID": student_id, "Score": score})
 
-                if student_name.lower() == user_name.lower():
-                    user_score = score
+                if student_id == user_id:
+                    user_score = score  # ✅ Get User Score
 
             except (ValueError, IndexError):
                 continue  # ❌ Ignore Invalid Rows
@@ -151,7 +152,7 @@ def show_rank(call):
 
         # 🔹 Find User Rank
         for idx, record in enumerate(sorted_records, 1):
-            if record["Name"].lower() == user_name.lower():
+            if record["ID"] == user_id:
                 user_rank = idx
 
         # ✅ Display User Rank & Top 5 Leaderboard
@@ -159,7 +160,14 @@ def show_rank(call):
         rank_text += "🏅 *Top 5 Players:*\n"
 
         for idx, record in enumerate(sorted_records[:5], 1):
-            rank_text += f"{idx}. {record['Name']} - {record['Score']} pts\n"
+            # ✅ Fetch Username from Telegram API using User ID
+            try:
+                user_info = bot.get_chat(record["ID"])
+                user_name = user_info.first_name if user_info.first_name else "Unknown"
+            except Exception:
+                user_name = "Unknown"
+
+            rank_text += f"{idx}. {user_name} - {record['Score']} pts\n"
 
         bot.send_message(chat_id, rank_text, parse_mode="Markdown")
 
