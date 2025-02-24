@@ -209,12 +209,10 @@ def show_rank(call):
         for idx, (uid, score) in enumerate(sorted_records[:5], 1):
             try:
                 user_info = bot.get_chat(uid)  # ✅ Directly fetch user data
-                print(f"User Info for {uid}: {user_info}")  # 🔍 Debugging Output
-
+                username = f"@{user_info.username}" if user_info.username else ""
                 first_name = user_info.first_name if user_info.first_name else ""
                 last_name = user_info.last_name if user_info.last_name else ""
-                username = f"@{user_info.username}" if user_info.username else ""
-
+               
                 if first_name or last_name:
                     user_name = f"{first_name} {last_name}".strip()  # ✅ Prefer full name
                 elif username:
@@ -223,8 +221,7 @@ def show_rank(call):
                     user_name = "Unknown"  # ❌ Fallback if nothing found
 
             except Exception as e:
-                print(f"Error fetching user info for {uid}: {e}")  # 🔍 Debugging
-                user_name = "Unknown"
+                user_name = str(uid)  
 
             rank_text += f"{idx}. {user_name} - {score} pts\n"
 
