@@ -102,8 +102,6 @@ def start_quiz_from_link(message):
         reply_markup=markup
     )
 
-
-
 @bot.callback_query_handler(func=lambda call: call.data.startswith("rank_"))
 def show_rank(call):
     chat_id = call.message.chat.id
@@ -115,11 +113,15 @@ def show_rank(call):
         return
 
     sheet_id = quiz["sheet"]
+    
     # Check if user rank is already in MongoDB
     user_rank_data = rank_collection.find_one({"quiz_id": quiz_id, "user_id": user_id})
     if user_rank_data:
-        rank_text = f"📌 *Your Rank:* {user_rank_data['rank']}/{user_rank_data['total_users']}\n📊 *Your Score:* {user_rank_data['score']}/{user_rank_data['total_marks']}\n\n"
-        bot.send_message(chat_id, rank_text, parse_mode="Markdown")
+        rank_text = (
+            f"📌 <b>Your Rank:</b> {user_rank_data['rank']}/{user_rank_data['total_users']}\n"
+            f"📊 <b>Your Score:</b> {user_rank_data['score']}/{user_rank_data['total_marks']}\n\n"
+        )
+        bot.send_message(chat_id, rank_text, parse_mode="HTML")
         return
         
     sheet_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv"
@@ -137,7 +139,6 @@ def show_rank(call):
             bot.send_message(chat_id, "❌ No quiz data found in the sheet!")
             return
 
-        leaderboard_text = "🏆 *Quiz Leaderboard:*\n\n"
         valid_records = {}
         total_marks = None
         user_score = None
@@ -201,8 +202,9 @@ def show_rank(call):
         })
         
         # ✅ Display User Rank & Top 5 Leaderboard
-        rank_text = f"📌 *Your Rank:* {user_rank}/{len(sorted_records)}\n📊 *Your Score:* {user_score}/{total_marks}\n\n"
-        rank_text += "🏅 *Top 5 Players:*\n"
+        rank_text = f"📌 <b>Your Rank:</b> {user_rank}/{len(sorted_records)}\n"
+        rank_text += f"📊 <b>Your Score:</b> {user_score}/{total_marks}\n\n"
+        rank_text += "<b>🏅 Top 5 Players:</b>\n"
 
         for idx, (uid, score) in enumerate(sorted_records[:5], 1):
             # ✅ Fetch Username from Telegram API using User ID
@@ -213,14 +215,12 @@ def show_rank(call):
                 user_name = "Unknown"
 
             rank_text += f"{idx}. {user_name} - {score} pts\n"
-        # ✅ Escape special characters before sending
-        rank_text = rank_text.replace("-", "\\-").replace(".", "\\.").replace("(", "\\(").replace(")", "\\)")
 
-        bot.send_message(chat_id, rank_text, parse_mode="MarkdownV2")
+        # ✅ Send Message without any Markdown Errors
+        bot.send_message(chat_id, rank_text, parse_mode="HTML")
 
     except Exception as e:
         bot.send_message(chat_id, f"❌ Error fetching leaderboard: {e}")
-
 
 ### ✅ Bot Start
 bot.polling(none_stop=True)
