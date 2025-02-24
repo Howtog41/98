@@ -66,7 +66,6 @@ def start_quiz(message):
 
     bot.send_message(chat_id, f"🎯 Click the link below to start the quiz:\n🔗 {custom_form_link}")
 
-### 🟢 3️⃣ Command: Get Leaderboard (/leaderboard)
 @bot.message_handler(commands=['leaderboard'])
 def leaderboard(message):
     chat_id = message.chat.id
@@ -100,11 +99,11 @@ def leaderboard(message):
 
         leaderboard_text = "🏆 *Quiz Leaderboard:*\n\n"
         valid_records = []
-        total_marks = None  # ✅ Total Marks Store Karne Ke Liye
+        total_marks = None  # ✅ Store Total Marks
 
         for row in rows[1:]:
             try:
-                student_name = row[2].strip()  # ✅ Name Extract Karo
+                student_name = row[2].strip()  # ✅ Column C (3rd Column) se Name Extract
                 score_parts = row[1].split("/")  # ✅ Split "X / Y" Format
                 score = int(score_parts[0].strip())  # ✅ Extract Score (X)
                 total = int(score_parts[1].strip())  # ✅ Extract Total Marks (Y)
@@ -114,24 +113,23 @@ def leaderboard(message):
 
                 valid_records.append({"Name": student_name, "Score": score})
             except (ValueError, IndexError):
-                continue  # ❌ Ignore invalid scores
+                continue  # ❌ Ignore Invalid Rows
 
         if not valid_records:
             bot.send_message(chat_id, "❌ No valid scores found in the sheet!")
             return
 
-        # ✅ Sort Users Based on Score (Descending)
+        # ✅ Sort Users Based on Score (Descending, Including 0 Scores)
         sorted_records = sorted(valid_records, key=lambda x: x["Score"], reverse=True)
 
         leaderboard_text += f"📌 *Total Marks:* {total_marks}\n\n"  # ✅ Show Total Marks
 
-        for idx, record in enumerate(sorted_records[:10], 1):  # ✅ Show Top 10 Only
+        for idx, record in enumerate(sorted_records, 1):  # ✅ Show All Users, Including 0 Scores
             leaderboard_text += f"{idx}. {record['Name']} - {record['Score']} / {total_marks} pts\n"
 
         bot.send_message(chat_id, leaderboard_text, parse_mode="Markdown")
     
     except Exception as e:
         bot.send_message(chat_id, f"❌ Error fetching leaderboard: {e}")
-
 ### ✅ Bot Start
 bot.polling(none_stop=True)
