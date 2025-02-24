@@ -4,18 +4,29 @@ import requests
 import csv
 import io
 import re
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # ✅ Bot Token
 BOT_TOKEN = "8151017957:AAF15t0POw7oHaFjC-AySwvDmNyS3tZxbTI"
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# ✅ Store Quiz Data { quiz_id: { "form": link, "sheet": link } }
+# ✅ Store Quiz Data { quiz_id: { "title": title, "form": link, "sheet": link } }
 QUIZ_DB = {}
 
 # 🔍 Extract Google Sheet ID from the given link
 def extract_sheet_id(sheet_url):
     match = re.search(r"/d/([a-zA-Z0-9-_]+)", sheet_url)
     return match.group(1) if match else None
+
+# 🔍 Extract Google Form Title from the HTML Content
+def extract_form_title(form_url):
+    try:
+        response = requests.get(form_url)
+        response.raise_for_status()
+        title_match = re.search(r"<title>(.*?)</title>", response.text)
+        return title_match.group(1) if title_match else "Quiz"
+    except:
+        return "Quiz"
 
 ### 🟢 1️⃣ Command: Register Quiz (/form_quiz)
 @bot.message_handler(commands=['form_quiz'])
@@ -26,10 +37,11 @@ def register_quiz(message):
 
 def get_form_link(message, chat_id):
     form_link = message.text
+    quiz_title = extract_form_title(form_link)  # ✅ Extract Form Title
     bot.send_message(chat_id, "📌 Now send the Google Sheet (Responses) link:")
-    bot.register_next_step_handler(message, get_sheet_link, chat_id, form_link)
+    bot.register_next_step_handler(message, get_sheet_link, chat_id, form_link, quiz_title)
 
-def get_sheet_link(message, chat_id, form_link):
+def get_sheet_link(message, chat_id, form_link, quiz_title):
     sheet_link = message.text
     sheet_id = extract_sheet_id(sheet_link)
 
@@ -38,47 +50,47 @@ def get_sheet_link(message, chat_id, form_link):
         return
 
     quiz_id = str(random.randint(1000, 9999))  # Unique Quiz ID Generate
-    QUIZ_DB[quiz_id] = {"form": form_link, "sheet": sheet_id}
+    QUIZ_DB[quiz_id] = {"title": quiz_title, "form": form_link, "sheet": sheet_id}
 
-    bot.send_message(chat_id, f"✅ Quiz Registered!\n\n📌 *Quiz ID:* `{quiz_id}`\n🔗 Use `/start_quiz {quiz_id}` to share with users!", parse_mode="Markdown")
+    shareable_link = f"https://t.me/{bot.get_me().username}?start=quiz_{quiz_id}"
 
-### 🟢 2️⃣ Command: Start Quiz (/start_quiz)
-@bot.message_handler(commands=['start_quiz'])
-def start_quiz(message):
+    bot.send_message(chat_id, f"✅ Quiz Registered!\n\n📌 *Quiz ID:* `{quiz_id}`\n📢 Share this link with users:\n🔗 {shareable_link}", parse_mode="Markdown")
+
+### 🟢 2️⃣ Start Quiz from Shareable Link (/start)
+@bot.message_handler(commands=['start'])
+def start_quiz_from_link(message):
     chat_id = message.chat.id
     msg_parts = message.text.split()
 
-    if len(msg_parts) < 2:
-        bot.send_message(chat_id, "❌ Please provide a valid Quiz ID! Example: `/start_quiz 1234`")
+    if len(msg_parts) < 2 or not msg_parts[1].startswith("quiz_"):
+        bot.send_message(chat_id, "❌ Invalid Quiz Link! Please use a valid shared link.")
         return
 
-    quiz_id = msg_parts[1]
+    quiz_id = msg_parts[1].replace("quiz_", "")
 
     if quiz_id not in QUIZ_DB:
-        bot.send_message(chat_id, "❌ Invalid Quiz ID! Please check and try again.")
+        bot.send_message(chat_id, "❌ Quiz not found! Please check the link and try again.")
         return
 
-    form_link = QUIZ_DB[quiz_id]["form"]
-    
-    # Extract Telegram Name
-    user_name = message.from_user.first_name
-    custom_form_link = form_link.replace("YourName", user_name)  # ✅ FIXED
+    quiz_title = QUIZ_DB[quiz_id]["title"]
 
-    bot.send_message(chat_id, f"🎯 Click the link below to start the quiz:\n🔗 {custom_form_link}")
+    # 🔹 Inline Keyboard for Start Test & Your Rank
+    markup = InlineKeyboardMarkup()
+    markup.row(
+        InlineKeyboardButton("🟢 Start Test", url=QUIZ_DB[quiz_id]["form"]),
+        InlineKeyboardButton("📊 Your Rank", callback_data=f"rank_{quiz_id}")
+    )
 
-@bot.message_handler(commands=['leaderboard'])
-def leaderboard(message):
-    chat_id = message.chat.id
-    msg_parts = message.text.split()
+    bot.send_message(chat_id, f"📌 *{quiz_title}*\n\nClick below to start the test or check your rank.", parse_mode="Markdown", reply_markup=markup)
 
-    if len(msg_parts) < 2:
-        bot.send_message(chat_id, "❌ Please provide a valid Quiz ID! Example: `/leaderboard 1234`")
-        return
-
-    quiz_id = msg_parts[1]
+### 🟢 3️⃣ Handle "Your Rank" Button Click
+@bot.callback_query_handler(func=lambda call: call.data.startswith("rank_"))
+def show_rank(call):
+    chat_id = call.message.chat.id
+    quiz_id = call.data.replace("rank_", "")
 
     if quiz_id not in QUIZ_DB:
-        bot.send_message(chat_id, "❌ Invalid Quiz ID!")
+        bot.answer_callback_query(call.id, "❌ Quiz not found!", show_alert=True)
         return
 
     sheet_id = QUIZ_DB[quiz_id]["sheet"]
@@ -100,6 +112,9 @@ def leaderboard(message):
         leaderboard_text = "🏆 *Quiz Leaderboard:*\n\n"
         valid_records = []
         total_marks = None  # ✅ Store Total Marks
+        user_score = None
+        user_rank = None
+        user_name = call.from_user.first_name
 
         for row in rows[1:]:
             try:
@@ -112,6 +127,10 @@ def leaderboard(message):
                     total_marks = total  # ✅ Set Total Marks (first occurrence)
 
                 valid_records.append({"Name": student_name, "Score": score})
+
+                if student_name.lower() == user_name.lower():
+                    user_score = score
+
             except (ValueError, IndexError):
                 continue  # ❌ Ignore Invalid Rows
 
@@ -119,17 +138,25 @@ def leaderboard(message):
             bot.send_message(chat_id, "❌ No valid scores found in the sheet!")
             return
 
-        # ✅ Sort Users Based on Score (Descending, Including 0 Scores)
+        # ✅ Sort Users Based on Score (Descending)
         sorted_records = sorted(valid_records, key=lambda x: x["Score"], reverse=True)
 
-        leaderboard_text += f"📌 *Total Marks:* {total_marks}\n\n"  # ✅ Show Total Marks
+        # 🔹 Find User Rank
+        for idx, record in enumerate(sorted_records, 1):
+            if record["Name"].lower() == user_name.lower():
+                user_rank = idx
 
-        for idx, record in enumerate(sorted_records, 1):  # ✅ Show All Users, Including 0 Scores
-            leaderboard_text += f"{idx}. {record['Name']} - {record['Score']} / {total_marks} pts\n"
+        # ✅ Display User Rank & Top 5 Leaderboard
+        rank_text = f"📌 *Your Rank:* {user_rank}/{len(sorted_records)}\n📊 *Your Score:* {user_score}/{total_marks}\n\n"
+        rank_text += "🏅 *Top 5 Players:*\n"
 
-        bot.send_message(chat_id, leaderboard_text, parse_mode="Markdown")
-    
+        for idx, record in enumerate(sorted_records[:5], 1):
+            rank_text += f"{idx}. {record['Name']} - {record['Score']} pts\n"
+
+        bot.send_message(chat_id, rank_text, parse_mode="Markdown")
+
     except Exception as e:
         bot.send_message(chat_id, f"❌ Error fetching leaderboard: {e}")
+
 ### ✅ Bot Start
 bot.polling(none_stop=True)
