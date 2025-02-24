@@ -6,7 +6,7 @@ import io
 import re
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pymongo import MongoClient
-
+from telegram.helpers import escape_markdown
 # Replace with your MongoDB connection string
 MONGO_URI = "mongodb+srv://terabox255:h9PjRSpCHsHw5zzt@cluster0.nakwhlt.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"  
 client = MongoClient(MONGO_URI)
@@ -209,7 +209,8 @@ def show_rank(call):
             # ✅ Fetch Username from Telegram API using User ID
             try:
                 user_info = bot.get_chat(uid)
-                user_name = user_info.first_name if user_info.first_name else "Unknown"
+                user_name = escape_markdown(user_info.first_name if user_info.first_name else "Unknown")
+except Exception:
             except Exception:
                 user_name = "Unknown"
 
