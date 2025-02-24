@@ -214,11 +214,15 @@ def show_rank(call):
         # ✅ Fetch Usernames Efficiently
         for uid, score in top_players:
             try:
-                if uid not in usernames:
-                    user_info = bot.get_chat(uid)
-                    usernames[uid] = escape_markdown(user_info.first_name if user_info.first_name else "Unknown")
+                user_info = bot.get_chat(uid)
+                if user_info.username:
+                    user_name = f"@{user_info.username}"  # ✅ Username show karega agar available hai
+                else:
+                    # ✅ Agar username nahi mila to First Name aur Last Name concatenate karein
+                    full_name = f"{user_info.first_name or ''} {user_info.last_name or ''}".strip()
+                    user_name = escape_markdown(full_name) if full_name else "Unknown"
             except Exception:
-                usernames[uid] = "Unknown"
+                user_name = "Unknown"
 
         for idx, (uid, score) in enumerate(top_players, 1):
             rank_text += f"{idx}. {usernames[uid]} - {score} pts\n"
