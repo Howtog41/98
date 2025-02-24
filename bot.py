@@ -104,25 +104,27 @@ def start_quiz_from_link(message):
     )
 
 
-
 @bot.callback_query_handler(func=lambda call: call.data.startswith("rank_"))
 def show_rank(call):
     chat_id = call.message.chat.id
     quiz_id = call.data.replace("rank_", "")
     user_id = call.from_user.id  # ✅ Store Current User ID
+
     quiz = quiz_collection.find_one({"quiz_id": quiz_id})
     if not quiz:
         bot.answer_callback_query(call.id, "❌ Quiz not found!", show_alert=True)
         return
 
     sheet_id = quiz["sheet"]
-    # Check if user rank is already in MongoDB
+
+    # ✅ Check MongoDB first
     user_rank_data = rank_collection.find_one({"quiz_id": quiz_id, "user_id": user_id})
     if user_rank_data:
-        rank_text = f"📌 *Your Rank:* {user_rank_data['rank']}/{user_rank_data['total_users']}\n📊 *Your Score:* {user_rank_data['score']}/{user_rank_data['total_marks']}\n\n"
+        rank_text = (f"📌 *Your Rank:* {user_rank_data.get('rank')}/{user_rank_data.get('total_users')}\n"
+                     f"📊 *Your Score:* {user_rank_data.get('score')}/{user_rank_data.get('total_marks')}\n\n")
         bot.send_message(chat_id, rank_text, parse_mode="Markdown")
         return
-        
+
     sheet_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv"
 
     try:
@@ -138,7 +140,6 @@ def show_rank(call):
             bot.send_message(chat_id, "❌ No quiz data found in the sheet!")
             return
 
-        leaderboard_text = "🏆 *Quiz Leaderboard:*\n\n"
         valid_records = {}
         total_marks = None
         user_score = None
@@ -162,11 +163,9 @@ def show_rank(call):
                 if total_marks is None:
                     total_marks = total  # ✅ Set Total Marks
 
-                # ✅ Ignore Duplicate Attempts, Keep Only First Entry
                 if student_id not in valid_records:
                     valid_records[student_id] = score
 
-                # ✅ Track if user attempted test
                 if student_id == user_id:
                     user_attempted = True
 
@@ -185,35 +184,44 @@ def show_rank(call):
             if uid == user_id:
                 user_rank = idx
                 user_score = score
+                break  # ✅ No need to continue looping after finding user
 
-        # ✅ If user did not attempt the test
         if not user_attempted:
             bot.send_message(chat_id, "❌ Aapne yeh test attend nahi kiya hai ya aapne apne predefined roll number ko badal diya hai!")
             return
-            
-        # Store user rank in MongoDB for future reference
-        rank_collection.insert_one({
-            "quiz_id": quiz_id,
-            "user_id": user_id,
-            "rank": user_rank,
-            "score": user_score,
-            "total_marks": total_marks,
-            "total_users": len(sorted_records)
-        })
-        
+
+        # ✅ Store rank only if not already stored
+        if not user_rank_data:
+            rank_collection.update_one(
+                {"quiz_id": quiz_id, "user_id": user_id},
+                {"$set": {
+                    "rank": user_rank,
+                    "score": user_score,
+                    "total_marks": total_marks,
+                    "total_users": len(sorted_records)
+                }},
+                upsert=True  # ✅ Avoid duplicate insertion
+            )
+
         # ✅ Display User Rank & Top 5 Leaderboard
-        rank_text = f"📌 *Your Rank:* {user_rank}/{len(sorted_records)}\n📊 *Your Score:* {user_score}/{total_marks}\n\n"
-        rank_text += "🏅 *Top 5 Players:*\n"
+        rank_text = (f"📌 *Your Rank:* {user_rank}/{len(sorted_records)}\n"
+                     f"📊 *Your Score:* {user_score}/{total_marks}\n\n"
+                     "🏅 *Top 5 Players:*\n")
 
-        for idx, (uid, score) in enumerate(sorted_records[:5], 1):
-            # ✅ Fetch Username from Telegram API using User ID
+        top_players = sorted_records[:5]
+        usernames = {}
+
+        # ✅ Fetch Usernames Efficiently
+        for uid, score in top_players:
             try:
-                user_info = bot.get_chat(uid)
-                user_name = escape_markdown(user_info.first_name if user_info.first_name else "Unknown")
+                if uid not in usernames:
+                    user_info = bot.get_chat(uid)
+                    usernames[uid] = escape_markdown(user_info.first_name if user_info.first_name else "Unknown")
             except Exception:
-                user_name = "Unknown"
+                usernames[uid] = "Unknown"
 
-            rank_text += f"{idx}. {user_name} - {score} pts\n"
+        for idx, (uid, score) in enumerate(top_players, 1):
+            rank_text += f"{idx}. {usernames[uid]} - {score} pts\n"
 
         bot.send_message(chat_id, rank_text, parse_mode="Markdown")
 
