@@ -210,7 +210,6 @@ def show_rank(call):
             try:
                 user_info = bot.get_chat(uid)
                 user_name = escape_markdown(user_info.first_name if user_info.first_name else "Unknown")
-except Exception:
             except Exception:
                 user_name = "Unknown"
 
