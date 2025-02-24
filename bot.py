@@ -115,9 +115,7 @@ def show_rank(call):
         csv_reader = csv.reader(io.StringIO(data))
         rows = list(csv_reader)
 
-        # 🔍 Debugging Print
-        print("CSV Data:", rows)
-
+        
         if len(rows) < 2:
             bot.send_message(chat_id, "❌ No quiz data found in the sheet!")
             return
@@ -150,11 +148,8 @@ def show_rank(call):
                     valid_records[student_id] = score
 
             except (ValueError, IndexError) as e:
-                print(f"Skipping invalid row: {row} | Error: {e}")  # 🔍 Debugging
-
-        # 🔍 Debugging Print
-        print("Valid Records (First Attempt Only):", valid_records)
-
+                
+        
         if not valid_records:
             bot.send_message(chat_id, "❌ No valid scores found in the sheet! Check format.")
             return
