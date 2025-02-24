@@ -147,7 +147,7 @@ def show_rank(call):
                 if student_id not in valid_records:
                     valid_records[student_id] = score
 
-            except (ValueError, IndexError) as e:
+           
                 
         
         if not valid_records:
