@@ -147,7 +147,8 @@ def show_rank(call):
                 if student_id not in valid_records:
                     valid_records[student_id] = score
 
-           
+           except (ValueError, IndexError) as e:
+                print(f"Skipping invalid row: {row} | Error: {e}")  # 🔍 Debugging
                 
         
         if not valid_records:
