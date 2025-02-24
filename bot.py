@@ -216,11 +216,11 @@ def show_rank(call):
             try:
                 user_info = bot.get_chat(uid)
                 if user_info.username:
-                    user_name = f"@{escape_markdown(user_info.username)}"  # ✅ Username show karega agar available hai
+                    user_name = f"@{escape_markdown(user_info.username, version=2)}"  # ✅ Username show karega agar available hai
                 else:
                     # ✅ Agar username nahi mila to First Name aur Last Name concatenate karein
                     full_name = f"{user_info.first_name or ''} {user_info.last_name or ''}".strip()
-                    user_name = escape_markdown(full_name) if full_name else "Unknown"
+                    user_name = escape_markdown(full_name, version=2) if full_name else "Unknown"
                 usernames[uid] = user_name  # ✅ Store username for later use
             except Exception:
                 usernames[uid] = "Unknown"
