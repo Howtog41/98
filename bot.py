@@ -5,13 +5,19 @@ import csv
 import io
 import re
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+from pymongo import MongoClient
+
+# Replace with your MongoDB connection string
+MONGO_URI = "mongodb+srv://terabox255:h9PjRSpCHsHw5zzt@cluster0.nakwhlt.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"  
+client = MongoClient(MONGO_URI)
+db = client["quiz_bot_db"]  # Database Name
+quiz_collection = db["quizzes"]  # Collection for storing quiz details
+rank_collection = db["rankings"]  # Collection for storing user ranks
 
 # ✅ Bot Token
 BOT_TOKEN = "8151017957:AAF15t0POw7oHaFjC-AySwvDmNyS3tZxbTI"
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# ✅ Store Quiz Data { quiz_id: { "title": title, "form": link, "sheet": link } }
-QUIZ_DB = {}
 
 # 🔍 Extract Google Sheet ID from the given link
 def extract_sheet_id(sheet_url):
@@ -50,8 +56,13 @@ def get_sheet_link(message, chat_id, form_link, quiz_title):
         return
 
     quiz_id = str(random.randint(1000, 9999))  # Unique Quiz ID Generate
-    QUIZ_DB[quiz_id] = {"title": quiz_title, "form": form_link, "sheet": sheet_id}
-
+    # Store in MongoDB
+    quiz_collection.insert_one({
+        "quiz_id": quiz_id,
+        "title": quiz_title,
+        "form": form_link,
+        "sheet": sheet_id
+    })
     shareable_link = f"https://t.me/{bot.get_me().username}?start=quiz_{quiz_id}"
 
     bot.send_message(chat_id, f"✅ Quiz Registered!\n<b>Quiz ID:</b> <code>{quiz_id}</code>\n📢 Share this link:\n<a href='{shareable_link}'>Click Here</a>", parse_mode="HTML")
@@ -66,13 +77,13 @@ def start_quiz_from_link(message):
         return
 
     quiz_id = msg_parts[1].replace("quiz_", "")
-
-    if quiz_id not in QUIZ_DB:
+    quiz = quiz_collection.find_one({"quiz_id": quiz_id})
+    if not quiz:
         bot.send_message(chat_id, "❌ Quiz not found! Please check the link and try again.")
         return
 
-    quiz_title = QUIZ_DB[quiz_id]["title"]
-    form_link = QUIZ_DB[quiz_id]["form"]
+    quiz_title = quiz["title"]
+    form_link = quiz["form"]
 
     # ✅ Extract Telegram User ID & Generate Prefilled Link
     user_id = str(message.from_user.id)  # Convert to string for URL
@@ -99,12 +110,19 @@ def show_rank(call):
     chat_id = call.message.chat.id
     quiz_id = call.data.replace("rank_", "")
     user_id = call.from_user.id  # ✅ Store Current User ID
-
-    if quiz_id not in QUIZ_DB:
+    quiz = quiz_collection.find_one({"quiz_id": quiz_id})
+    if not quiz:
         bot.answer_callback_query(call.id, "❌ Quiz not found!", show_alert=True)
         return
 
-    sheet_id = QUIZ_DB[quiz_id]["sheet"]
+    sheet_id = quiz["sheet"]
+    # Check if user rank is already in MongoDB
+    user_rank_data = rank_collection.find_one({"quiz_id": quiz_id, "user_id": user_id})
+    if user_rank_data:
+        rank_text = f"📌 *Your Rank:* {user_rank_data['rank']}/{user_rank_data['total_users']}\n📊 *Your Score:* {user_rank_data['score']}/{user_rank_data['total_marks']}\n\n"
+        bot.send_message(chat_id, rank_text, parse_mode="Markdown")
+        return
+        
     sheet_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv"
 
     try:
@@ -172,7 +190,17 @@ def show_rank(call):
         if not user_attempted:
             bot.send_message(chat_id, "❌ Aapne yeh test attend nahi kiya hai ya aapne apne predefined roll number ko badal diya hai!")
             return
-
+            
+        # Store user rank in MongoDB for future reference
+        rank_collection.insert_one({
+            "quiz_id": quiz_id,
+            "user_id": user_id,
+            "rank": user_rank,
+            "score": user_score,
+            "total_marks": total_marks,
+            "total_users": len(sorted_records)
+        })
+        
         # ✅ Display User Rank & Top 5 Leaderboard
         rank_text = f"📌 *Your Rank:* {user_rank}/{len(sorted_records)}\n📊 *Your Score:* {user_score}/{total_marks}\n\n"
         rank_text += "🏅 *Top 5 Players:*\n"
