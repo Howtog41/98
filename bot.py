@@ -104,7 +104,7 @@ def leaderboard(message):
 
         for row in rows[1:]:
             try:
-                name = row[0].strip()  # ✅ Name Extract Karo
+                student_name = row[2].strip()  # ✅ Name Extract Karo
                 score_parts = row[1].split("/")  # ✅ Split "X / Y" Format
                 score = int(score_parts[0].strip())  # ✅ Extract Score (X)
                 total = int(score_parts[1].strip())  # ✅ Extract Total Marks (Y)
@@ -112,7 +112,7 @@ def leaderboard(message):
                 if total_marks is None:
                     total_marks = total  # ✅ Set Total Marks (first occurrence)
 
-                valid_records.append({"Name": name, "Score": score})
+                valid_records.append({"Name": student_name, "Score": score})
             except (ValueError, IndexError):
                 continue  # ❌ Ignore invalid scores
 
