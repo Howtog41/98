@@ -212,11 +212,12 @@ def show_rank(call):
                 username = f"@{user_info.username}" if user_info.username else ""
                 first_name = user_info.first_name if user_info.first_name else ""
                 last_name = user_info.last_name if user_info.last_name else ""
-               
-                if first_name or last_name:
-                    user_name = f"{first_name} {last_name}".strip()  # ✅ Prefer full name
-                elif username:
-                    user_name = username  # ✅ Use username if no name
+
+
+                if username:
+                    user_name = username
+                elif first_name or last_name:
+                    user_name = f"{first_name} {last_name}".strip()
                 else:
                     user_name = "Unknown"  # ❌ Fallback if nothing found
 
