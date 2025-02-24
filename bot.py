@@ -217,7 +217,7 @@ def show_rank(call):
             rank_text += f"{idx}. {user_name} - {score} pts\n"
 
         # ✅ Send Message without any Markdown Errors
-        bot.send_message(chat_id, rank_text, parse_mode="HTML")
+        bot.send_message(chat_id, rank_text)
 
     except Exception as e:
         bot.send_message(chat_id, f"❌ Error fetching leaderboard: {e}")
