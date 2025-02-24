@@ -97,7 +97,7 @@ def start_quiz_from_link(message):
 def show_rank(call):
     chat_id = call.message.chat.id
     quiz_id = call.data.replace("rank_", "")
-    user_id = call.from_user.id  # ✅ Store User ID
+    user_id = call.from_user.id  # ✅ Store Current User ID
 
     if quiz_id not in QUIZ_DB:
         bot.answer_callback_query(call.id, "❌ Quiz not found!", show_alert=True)
@@ -115,64 +115,76 @@ def show_rank(call):
         csv_reader = csv.reader(io.StringIO(data))
         rows = list(csv_reader)
 
+        # 🔍 Debugging Print
+        print("CSV Data:", rows)
+
         if len(rows) < 2:
             bot.send_message(chat_id, "❌ No quiz data found in the sheet!")
             return
 
         leaderboard_text = "🏆 *Quiz Leaderboard:*\n\n"
-        valid_records = []
+        valid_records = {}
         total_marks = None
         user_score = None
         user_rank = None
 
-        for row in rows[1:]:
+        for row in rows[1:]:  # Skip Header
             try:
-                student_id = int(row[2].strip())  # ✅ Column A (1st Column) → User ID
-                score_parts = row[1].split("/")  # ✅ "X / Y" Format
+                if len(row) < 3:
+                    continue  # ❌ Skip invalid rows
+
+                student_id = int(row[2].strip())  # ✅ Column C (3rd Column) → User ID
+                score_parts = row[1].strip().split("/")  # ✅ Column B (2nd Column) → "X / Y" Format
+
+                if len(score_parts) != 2:
+                    continue  # ❌ Skip invalid score format
+
                 score = int(score_parts[0].strip())  # ✅ Extract Score
                 total = int(score_parts[1].strip())  # ✅ Extract Total Marks
 
                 if total_marks is None:
                     total_marks = total  # ✅ Set Total Marks
 
-                valid_records.append({"ID": student_id, "Score": score})
+                # ✅ Ignore Duplicate Attempts, Keep Only First Entry
+                if student_id not in valid_records:
+                    valid_records[student_id] = score
 
-                if student_id == user_id:
-                    user_score = score  # ✅ Get User Score
+            except (ValueError, IndexError) as e:
+                print(f"Skipping invalid row: {row} | Error: {e}")  # 🔍 Debugging
 
-            except (ValueError, IndexError):
-                continue  # ❌ Ignore Invalid Rows
+        # 🔍 Debugging Print
+        print("Valid Records (First Attempt Only):", valid_records)
 
         if not valid_records:
-            bot.send_message(chat_id, "❌ No valid scores found in the sheet!")
+            bot.send_message(chat_id, "❌ No valid scores found in the sheet! Check format.")
             return
 
         # ✅ Sort Users Based on Score (Descending)
-        sorted_records = sorted(valid_records, key=lambda x: x["Score"], reverse=True)
+        sorted_records = sorted(valid_records.items(), key=lambda x: x[1], reverse=True)
 
         # 🔹 Find User Rank
-        for idx, record in enumerate(sorted_records, 1):
-            if record["ID"] == user_id:
+        for idx, (uid, score) in enumerate(sorted_records, 1):
+            if uid == user_id:
                 user_rank = idx
+                user_score = score
 
         # ✅ Display User Rank & Top 5 Leaderboard
         rank_text = f"📌 *Your Rank:* {user_rank}/{len(sorted_records)}\n📊 *Your Score:* {user_score}/{total_marks}\n\n"
         rank_text += "🏅 *Top 5 Players:*\n"
 
-        for idx, record in enumerate(sorted_records[:5], 1):
+        for idx, (uid, score) in enumerate(sorted_records[:5], 1):
             # ✅ Fetch Username from Telegram API using User ID
             try:
-                user_info = bot.get_chat(record["ID"])
+                user_info = bot.get_chat(uid)
                 user_name = user_info.first_name if user_info.first_name else "Unknown"
             except Exception:
                 user_name = "Unknown"
 
-            rank_text += f"{idx}. {user_name} - {record['Score']} pts\n"
+            rank_text += f"{idx}. {user_name} - {score} pts\n"
 
         bot.send_message(chat_id, rank_text, parse_mode="Markdown")
 
     except Exception as e:
         bot.send_message(chat_id, f"❌ Error fetching leaderboard: {e}")
-
 ### ✅ Bot Start
 bot.polling(none_stop=True)
