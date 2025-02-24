@@ -54,7 +54,7 @@ def get_sheet_link(message, chat_id, form_link, quiz_title):
 
     shareable_link = f"https://t.me/{bot.get_me().username}?start=quiz_{quiz_id}"
 
-    bot.send_message(chat_id, f"✅ Quiz Registered!<br><b>Quiz ID:</b> <code>{quiz_id}</code><br>📢 Share this link:<br><a href='{shareable_link}'>Click Here</a>", parse_mode="HTML")
+    bot.send_message(chat_id, f"✅ Quiz Registered!\n<b>Quiz ID:</b> <code>{quiz_id}</code>\n📢 Share this link:\n<a href='{shareable_link}'>Click Here</a>", parse_mode="HTML")
 
 ### 🟢 2️⃣ Start Quiz from Shareable Link (/start)
 @bot.message_handler(commands=['start'])
