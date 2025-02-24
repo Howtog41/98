@@ -221,12 +221,12 @@ def show_rank(call):
                     # ✅ Agar username nahi mila to First Name aur Last Name concatenate karein
                     full_name = f"{user_info.first_name or ''} {user_info.last_name or ''}".strip()
                     user_name = escape_markdown(full_name) if full_name else "Unknown"
+                usernames[uid] = user_name  # ✅ Store username for later use
             except Exception:
-                user_name = "Unknown"
+                usernames[uid] = "Unknown"
 
         for idx, (uid, score) in enumerate(top_players, 1):
-            rank_text += f"{idx}. {usernames[uid]} - {score} pts\n"
-
+            rank_text += f"{idx}. {usernames.get(uid, 'Unknown')} - {score} pts\n"
         bot.send_message(chat_id, rank_text, parse_mode="Markdown")
 
     except Exception as e:
