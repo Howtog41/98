@@ -98,15 +98,38 @@ def leaderboard(message):
             bot.send_message(chat_id, "❌ No quiz data found in the sheet!")
             return
 
-        # Leaderboard Sorting
-        leaderboard_text = "🏆 *Leaderboard:*\n\n"
-        sorted_records = sorted(rows[1:], key=lambda x: int(x[1]), reverse=True)[:10]  # Sort Top 10
+        leaderboard_text = "🏆 *Quiz Leaderboard:*\n\n"
+        valid_records = []
+        total_marks = None  # ✅ Total Marks Store Karne Ke Liye
 
-        for idx, record in enumerate(sorted_records, 1):
-            leaderboard_text += f"{idx}. {record[0]} - {record[1]} pts\n"
+        for row in rows[1:]:
+            try:
+                name = row[0].strip()  # ✅ Name Extract Karo
+                score_parts = row[1].split("/")  # ✅ Split "X / Y" Format
+                score = int(score_parts[0].strip())  # ✅ Extract Score (X)
+                total = int(score_parts[1].strip())  # ✅ Extract Total Marks (Y)
+
+                if total_marks is None:
+                    total_marks = total  # ✅ Set Total Marks (first occurrence)
+
+                valid_records.append({"Name": name, "Score": score})
+            except (ValueError, IndexError):
+                continue  # ❌ Ignore invalid scores
+
+        if not valid_records:
+            bot.send_message(chat_id, "❌ No valid scores found in the sheet!")
+            return
+
+        # ✅ Sort Users Based on Score (Descending)
+        sorted_records = sorted(valid_records, key=lambda x: x["Score"], reverse=True)
+
+        leaderboard_text += f"📌 *Total Marks:* {total_marks}\n\n"  # ✅ Show Total Marks
+
+        for idx, record in enumerate(sorted_records[:10], 1):  # ✅ Show Top 10 Only
+            leaderboard_text += f"{idx}. {record['Name']} - {record['Score']} / {total_marks} pts\n"
 
         bot.send_message(chat_id, leaderboard_text, parse_mode="Markdown")
-
+    
     except Exception as e:
         bot.send_message(chat_id, f"❌ Error fetching leaderboard: {e}")
 
