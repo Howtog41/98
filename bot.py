@@ -56,7 +56,6 @@ def get_sheet_link(message, chat_id, form_link, quiz_title):
 
     bot.send_message(chat_id, f"✅ Quiz Registered!\n<b>Quiz ID:</b> <code>{quiz_id}</code>\n📢 Share this link:\n<a href='{shareable_link}'>Click Here</a>", parse_mode="HTML")
 
-### 🟢 2️⃣ Start Quiz from Shareable Link (/start)
 @bot.message_handler(commands=['start'])
 def start_quiz_from_link(message):
     chat_id = message.chat.id
@@ -73,16 +72,25 @@ def start_quiz_from_link(message):
         return
 
     quiz_title = QUIZ_DB[quiz_id]["title"]
+    form_link = QUIZ_DB[quiz_id]["form"]
 
-    # 🔹 Inline Keyboard for Start Test & Your Rank
+    # ✅ Extract Telegram Name & Generate Prefilled Link
+    user_name = message.from_user.first_name or "User"
+    custom_form_link = form_link.replace("YourName", user_name)  
+
+    # ✅ Inline Keyboard for Start Test & Your Rank
     markup = InlineKeyboardMarkup()
     markup.row(
-        InlineKeyboardButton("🟢 Start Test", url=QUIZ_DB[quiz_id]["form"]),
+        InlineKeyboardButton("🟢 Start Test", url=custom_form_link),
         InlineKeyboardButton("📊 Your Rank", callback_data=f"rank_{quiz_id}")
     )
 
-    bot.send_message(chat_id, f"📌 *{quiz_title}*\n\nClick below to start the test or check your rank.", parse_mode="Markdown", reply_markup=markup)
-
+    bot.send_message(
+        chat_id,
+        f"📌 *{quiz_title}*\n\nClick below to start the test or check your rank.",
+        parse_mode="Markdown",
+        reply_markup=markup
+    )
 ### 🟢 3️⃣ Handle "Your Rank" Button Click
 @bot.callback_query_handler(func=lambda call: call.data.startswith("rank_"))
 def show_rank(call):
