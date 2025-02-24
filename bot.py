@@ -113,17 +113,50 @@ def show_rank(call):
         return
 
     sheet_id = quiz["sheet"]
-    
-    # Check if user rank is already in MongoDB
+
+    # ✅ Check if user rank is in MongoDB
     user_rank_data = rank_collection.find_one({"quiz_id": quiz_id, "user_id": user_id})
+    
     if user_rank_data:
+        # ✅ Fetch and Update Top 5 from MongoDB
+        all_ranks = list(rank_collection.find({"quiz_id": quiz_id}))
+        sorted_records = sorted(all_ranks, key=lambda x: x['score'], reverse=True)
+
+        # ✅ Remove Unknown Users
+        top_5 = []
+        for record in sorted_records:
+            try:
+                user_info = bot.get_chat(record["user_id"])
+                username = f"@{user_info.username}" if user_info.username else ""
+                first_name = user_info.first_name if user_info.first_name else ""
+                last_name = user_info.last_name if user_info.last_name else ""
+
+                if username:
+                    user_name = username
+                elif first_name or last_name:
+                    user_name = f"{first_name} {last_name}".strip()
+                else:
+                    continue  # ❌ Skip Unknown Users
+
+                top_5.append((user_name, record["score"]))
+                if len(top_5) >= 5:
+                    break
+            except:
+                continue  # ❌ Skip Unknown Users
+        
         rank_text = (
             f"📌 <b>Your Rank:</b> {user_rank_data['rank']}/{user_rank_data['total_users']}\n"
             f"📊 <b>Your Score:</b> {user_rank_data['score']}/{user_rank_data['total_marks']}\n\n"
+            "<b>🏅 Top 5 Players:</b>\n"
         )
+
+        for idx, (user_name, score) in enumerate(top_5, 1):
+            rank_text += f"{idx}. {user_name} - {score} pts\n"
+
         bot.send_message(chat_id, rank_text, parse_mode="HTML")
         return
-        
+
+    # ✅ If Not in MongoDB, Fetch Data from Google Sheet
     sheet_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv"
 
     try:
@@ -131,7 +164,6 @@ def show_rank(call):
         response.raise_for_status()
         data = response.text
 
-        # ✅ Parse CSV Data
         csv_reader = csv.reader(io.StringIO(data))
         rows = list(csv_reader)
 
@@ -191,7 +223,7 @@ def show_rank(call):
             bot.send_message(chat_id, "❌ Aapne yeh test attend nahi kiya hai ya aapne apne predefined roll number ko badal diya hai!")
             return
             
-        # Store user rank in MongoDB for future reference
+        # ✅ Store user rank in MongoDB
         rank_collection.insert_one({
             "quiz_id": quiz_id,
             "user_id": user_id,
@@ -201,33 +233,35 @@ def show_rank(call):
             "total_users": len(sorted_records)
         })
         
-        # ✅ Display User Rank & Top 5 Leaderboard
-        rank_text = f"📌 <b>Your Rank:</b> {user_rank}/{len(sorted_records)}\n"
-        rank_text += f"📊 <b>Your Score:</b> {user_score}/{total_marks}\n\n"
-        rank_text += "<b>🏅 Top 5 Players:</b>\n"
-
-        for idx, (uid, score) in enumerate(sorted_records[:5], 1):
+        # ✅ Update & Display Top 5 Leaderboard
+        top_5 = []
+        for idx, (uid, score) in enumerate(sorted_records, 1):
             try:
-                user_info = bot.get_chat(uid)  # ✅ Directly fetch user data
+                user_info = bot.get_chat(uid)
                 username = f"@{user_info.username}" if user_info.username else ""
                 first_name = user_info.first_name if user_info.first_name else ""
                 last_name = user_info.last_name if user_info.last_name else ""
-
 
                 if username:
                     user_name = username
                 elif first_name or last_name:
                     user_name = f"{first_name} {last_name}".strip()
                 else:
-                    user_name = "Unknown"  # ❌ Fallback if nothing found
+                    continue  # ❌ Skip Unknown Users
 
-            except Exception as e:
-                user_name = str(uid)  
+                top_5.append((user_name, score))
+                if len(top_5) >= 5:
+                    break
+            except:
+                continue  # ❌ Skip Unknown Users
+        
+        rank_text = f"📌 <b>Your Rank:</b> {user_rank}/{len(sorted_records)}\n"
+        rank_text += f"📊 <b>Your Score:</b> {user_score}/{total_marks}\n\n"
+        rank_text += "<b>🏅 Top 5 Players:</b>\n"
 
+        for idx, (user_name, score) in enumerate(top_5, 1):
             rank_text += f"{idx}. {user_name} - {score} pts\n"
 
-
-        # ✅ Send Message without any Markdown Errors
         bot.send_message(chat_id, rank_text, parse_mode="HTML")
 
     except Exception as e:
