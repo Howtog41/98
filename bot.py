@@ -81,4 +81,4 @@ app.add_handler(PollAnswerHandler(handle_poll_answer))
 # Run the bot with Webhook
 if __name__ == "__main__":
     print("Bot is running...")
-    app.run_polling()
+    app.run_webhook(listen="0.0.0.0", port=int(os.environ.get("PORT", 8443)), url_path=TOKEN)
