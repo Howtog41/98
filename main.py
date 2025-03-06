@@ -72,7 +72,7 @@ def load_plugins():
                 module.register_handlers(dp, saved_quizzes, creating_quizzes, save_quiz_to_db, quizzes_collection)
 
 
-@dp.message_handler(commands=['start'])
+@router.message(Command("start")) 
 async def start_handler(message: types.Message):
     """
     Handle the /start command.
