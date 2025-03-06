@@ -44,6 +44,11 @@ async def send_next_question(update: Update, context: ContextTypes.DEFAULT_TYPE,
         open_period=10
     )
     context.bot_data[message.poll.id] = {"user_id": user_id, "correct": question_data["correct"], "update": update}
+    
+    # Schedule next question after open period ends
+    await asyncio.sleep(10)
+    user_active_quiz[user_id] += 1
+    await send_next_question(update, context, user_id)
 
 async def handle_poll_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     poll_answer = update.poll_answer
