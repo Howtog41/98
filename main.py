@@ -2,8 +2,10 @@ import os
 import importlib
 import asyncio
 from pymongo import MongoClient
-from aiogram import Bot, Dispatcher, types
-from aiogram import Bot, Dispatcher
+from aiogram import Bot, Dispatcher, types, Router
+from aiogram.filters import Command
+from aiogram.types import Message
+
 
 # Bot Token
 BOT_TOKEN = '8151017957:AAF15t0POw7oHaFjC-AySwvDmNyS3tZxbTI'  # ✅ अपना टोकन डालें
@@ -17,7 +19,7 @@ MONGO_URI = "mongodb+srv://terabox255:h9PjRSpCHsHw5zzt@cluster0.nakwhlt.mongodb.
 client = MongoClient(MONGO_URI)
 db = client['mydatabase']  # ✅ अपनी डेटाबेस का नाम डालें
 quizzes_collection = db['quizzes']
-
+router = Router()
 # In-memory storage
 saved_quizzes = {}
 creating_quizzes = {}
@@ -81,6 +83,7 @@ async def start_handler(message: types.Message):
 
 
 async def main():
+    dp.include_router(router) 
     """
     Main function to start the bot.
     """
