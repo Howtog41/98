@@ -25,16 +25,24 @@ QUESTIONS = [
     {"question": "Who wrote 'Hamlet'?", "options": ["Shakespeare", "Hemingway", "Tolstoy", "Orwell"], "correct": 0, "explanation": "William Shakespeare wrote 'Hamlet'."},
 ]
 
+user_active_quiz = {}
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Welcome to the Telegram Quiz Bot! Use /quiz to start the quiz.")
 
 async def start_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     user_scores.update_one({"user_id": user_id}, {"$setOnInsert": {"score": 0}}, upsert=True)
+    user_active_quiz[user_id] = 0
     await send_next_question(update, context, user_id)
 
 async def send_next_question(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int):
-    question_data = random.choice(QUESTIONS)
+    if user_active_quiz[user_id] >= len(QUESTIONS):
+        await show_leaderboard(update, context)
+        del user_active_quiz[user_id]
+        return
+    
+    question_data = QUESTIONS[user_active_quiz[user_id]]
     message = await update.message.reply_poll(
         question=question_data["question"],
         options=question_data["options"],
@@ -46,6 +54,7 @@ async def send_next_question(update: Update, context: ContextTypes.DEFAULT_TYPE,
     )
     context.bot_data[message.poll.id] = {"user_id": user_id, "correct": question_data["correct"], "update": update}
     await asyncio.sleep(10)
+    user_active_quiz[user_id] += 1
     await send_next_question(update, context, user_id)
 
 async def handle_poll_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -58,6 +67,7 @@ async def handle_poll_answer(update: Update, context: ContextTypes.DEFAULT_TYPE)
         update = context.bot_data[poll_id]["update"]
         if poll_answer.option_ids[0] == correct_answer:
             user_scores.update_one({"user_id": user_id}, {"$inc": {"score": 1}})
+        user_active_quiz[user_id] += 1
         await send_next_question(update, context, user_id)
 
 async def show_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
