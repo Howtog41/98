@@ -3,7 +3,7 @@ import importlib
 import asyncio
 from pymongo import MongoClient
 from aiogram import Bot, Dispatcher, types
-from aiogram.utils import executor
+from aiogram import Bot, Dispatcher
 
 # Bot Token
 BOT_TOKEN = '8151017957:AAF15t0POw7oHaFjC-AySwvDmNyS3tZxbTI'  # ✅ अपना टोकन डालें
