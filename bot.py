@@ -61,12 +61,18 @@ async def handle_poll_answer(update: Update, context: ContextTypes.DEFAULT_TYPE)
     poll_answer = update.poll_answer
     poll_id = poll_answer.poll_id
     user_id = poll_answer.user.id
-    
+
     if poll_id in context.bot_data:
         correct_answer = context.bot_data[poll_id]["correct"]
         update = context.bot_data[poll_id]["update"]
+
+        # Ensure user is in active quiz state
+        if user_id not in user_active_quiz:
+            user_active_quiz[user_id] = 0  # Initialize user progress
+        
         if poll_answer.option_ids[0] == correct_answer:
             user_scores.update_one({"user_id": user_id}, {"$inc": {"score": 1}})
+        
         user_active_quiz[user_id] += 1
         await send_next_question(update, context, user_id)
 
