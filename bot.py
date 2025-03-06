@@ -3,7 +3,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, PollAnswerHandler, 
 import asyncio
 import random
 import logging
-import psycopg2
+from pymongo import MongoClient
 import os
 
 # Configure Logging
@@ -11,25 +11,12 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 # Bot Token
 TOKEN = "8151017957:AAF15t0POw7oHaFjC-AySwvDmNyS3tZxbTI"
-DATABASE_URL = "mongodb+srv://terabox255:h9PjRSpCHsHw5zzt@cluster0.nakwhlt.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+MONGO_URI = "mongodb+srv://terabox255:h9PjRSpCHsHw5zzt@cluster0.nakwhlt.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 
-# Connect to PostgreSQL Database
-def connect_db():
-    return psycopg2.connect(DATABASE_URL, sslmode='require')
-
-# Create Table for User Scores
-def setup_database():
-    conn = connect_db()
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS user_scores (
-            user_id BIGINT PRIMARY KEY,
-            score INT DEFAULT 0
-        )
-    """)
-    conn.commit()
-    cursor.close()
-    conn.close()
+# Connect to MongoDB
+db_client = MongoClient(MONGO_URI)
+db = db_client["quiz_bot"]
+user_scores = db["user_scores"]
 
 # Sample Questions
 QUESTIONS = [
@@ -43,12 +30,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def start_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
-    conn = connect_db()
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO user_scores (user_id) VALUES (%s) ON CONFLICT (user_id) DO NOTHING", (user_id,))
-    conn.commit()
-    cursor.close()
-    conn.close()
+    user_scores.update_one({"user_id": user_id}, {"$setOnInsert": {"score": 0}}, upsert=True)
     await send_next_question(update, context, user_id)
 
 async def send_next_question(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int):
@@ -75,34 +57,21 @@ async def handle_poll_answer(update: Update, context: ContextTypes.DEFAULT_TYPE)
         correct_answer = context.bot_data[poll_id]["correct"]
         update = context.bot_data[poll_id]["update"]
         if poll_answer.option_ids[0] == correct_answer:
-            conn = connect_db()
-            cursor = conn.cursor()
-            cursor.execute("UPDATE user_scores SET score = score + 1 WHERE user_id = %s", (user_id,))
-            conn.commit()
-            cursor.close()
-            conn.close()
+            user_scores.update_one({"user_id": user_id}, {"$inc": {"score": 1}})
         await send_next_question(update, context, user_id)
 
 async def show_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    conn = connect_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT user_id, score FROM user_scores ORDER BY score DESC LIMIT 5")
-    leaderboard = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    
-    if not leaderboard:
-        await update.message.reply_text("No scores yet!")
-        return
-    
+    leaderboard = user_scores.find().sort("score", -1).limit(5)
     leaderboard_text = "🏆 Leaderboard:\n"
-    for i, (user_id, score) in enumerate(leaderboard, start=1):
-        leaderboard_text += f"{i}. User {user_id}: {score} points\n"
+    for i, user in enumerate(leaderboard, start=1):
+        leaderboard_text += f"{i}. User {user['user_id']}: {user['score']} points\n"
     
-    await update.message.reply_text(leaderboard_text)
+    if not leaderboard_text.strip():
+        await update.message.reply_text("No scores yet!")
+    else:
+        await update.message.reply_text(leaderboard_text)
 
 # Setup Application
-setup_database()
 app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("quiz", start_quiz))
